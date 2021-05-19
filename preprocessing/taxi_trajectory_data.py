@@ -1,12 +1,10 @@
 import json
 import math
-import multiprocessing
-from typing import Callable, List
+from pathlib import Path
+from typing import List
 
+import modin.pandas as pd
 import numpy as np
-import pandas as pd
-from joblib import delayed, Parallel
-from numpy.lib.stride_tricks import sliding_window_view
 from numpy.lib.stride_tricks import as_strided
 
 EPSILON = 1e-10
@@ -26,17 +24,33 @@ panda_types = {
 
 
 def prepare_taxi_data(seq_len=256, window_len=32):
-    train_df = pd.read_csv("../data/train.csv", dtype=panda_types, usecols=['TRIP_ID', 'TAXI_ID', 'POLYLINE'])
-    train_df = applyParallel(train_df.groupby([]))
-    train_df['POLYLINE_parsed'] = train_df['POLYLINE'].apply(lambda s: sliding_window_view(np.array(json.loads(s))))
+    file_path = Path("../data/train-preprocessed-taxi.pkl")
+    if file_path.exists():
+        print("Preprocessed taxi data file already exists")
+        return
+    train_df = pd.read_csv("../data/train.csv", dtype=panda_types, usecols=['TAXI_ID', 'POLYLINE'])
+    train_df['TAXI_ID'] = train_df['TAXI_ID'].rank(method='dense').astype(int)
+    train_df['POLYLINE'] = train_df['POLYLINE'].transform(lambda s: sliding_window(json.loads(s), seq_len, window_len))
+    train_df = train_df[train_df['POLYLINE'].map(len) > 0]
+    train_df = train_df.explode('POLYLINE')
+    train_df.to_pickle(file_path)
 
 
 def sliding_window(lst: List, window_size: int, slide_step: int):
     output_len = 1 + max(0, int(math.ceil((len(lst) - window_size) / slide_step)))
-    return [lst[step * slide_step:step * slide_step + window_size] for step in range(output_len)]
+
+    windowed_results = [
+        calc_feature_stat_matrix(calc_car_movement_features(lst[step * slide_step:step * slide_step + window_size]))
+        for step in range(output_len)
+    ]
+
+    return [element for element in windowed_results if element is not None]
 
 
 def calc_car_movement_features(lst: List):
+    if len(lst) < 4:
+        return None
+
     gps_pos = np.array(lst, dtype=np.float64)
     seq_len, dim = gps_pos.shape
     result_seq_len = seq_len - 3
@@ -57,6 +71,12 @@ def calc_car_movement_features(lst: List):
 
 
 def calc_feature_stat_matrix(arr: np.ndarray):
+    if arr is None:
+        return None
+
+    if arr.shape[0] == 0:
+        return None
+
     pad_width = max(int(math.ceil(np.prod(arr.shape) / (2 * 5))) * 2, 4)
     arr = np.pad(arr, ((0, pad_width - arr.shape[0]), (0, 0)), 'symmetric')
     x = as_strided(arr, shape=(pad_width // 2 - 1, 4, 5), strides=(80, 40, 8))
@@ -79,6 +99,5 @@ def apply_sliding_window_to_polyline(df: pd.DataFrame):
     return df
 
 
-def applyParallel(dfGrouped, func: Callable):
-    retLst = Parallel(n_jobs=multiprocessing.cpu_count())(delayed(func)(group) for name, group in dfGrouped)
-    return pd.concat(retLst)
+if __name__ == '__main__':
+    prepare_taxi_data()
