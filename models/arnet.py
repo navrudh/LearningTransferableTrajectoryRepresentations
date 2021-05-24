@@ -20,10 +20,10 @@ class ARNet(torch.nn.Module):
         self.tanh = torch.nn.Tanh()
 
     def forward(self, x):
-        b, t, f = x.shape
+        # b, t, f = x.shape
         _, h_n = self.gru_layers(x)
-        h_last_layer = h_n.view(b, 2, self.hidden_size)[:, -1, :]
-        x_hat = self.dropout(h_last_layer)
-        rec = self.tanh(self.fc2(self.relu(self.fc1(x_hat))))
-        pred = self.fc3(x_hat)
-        return x_hat, rec, pred
+        h_last_layer = h_n.view(-1, 2, self.hidden_size)[:, -1, :]
+        x_hat: torch.Tensor = self.dropout(h_last_layer)
+        rec: torch.Tensor = self.tanh(self.fc2(self.relu(self.fc1(x_hat))))
+        y_pred: torch.Tensor = self.fc3(x_hat)
+        return x_hat, rec, y_pred

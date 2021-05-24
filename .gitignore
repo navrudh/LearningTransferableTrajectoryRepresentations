@@ -36,4 +36,8 @@ ENV/
 # mpeltonen/sbt-idea plugin
 .idea_modules/
 
+# Pytorch
+lightning_logs
+
+# app specific
 data
