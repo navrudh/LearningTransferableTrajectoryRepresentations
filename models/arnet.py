@@ -1,3 +1,9 @@
+"""
+Paper: Autoencoder Regularized Network For Driving Style Representation Learning
+
+Link: arXiv:1701.01272v1
+"""
+
 import torch.nn
 
 
