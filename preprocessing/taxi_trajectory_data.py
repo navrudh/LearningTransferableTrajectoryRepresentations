@@ -100,4 +100,8 @@ def apply_sliding_window_to_polyline(df: pd.DataFrame):
 
 
 if __name__ == '__main__':
+    import ray
+    ray.shutdown()
+    ray.init()
+
     prepare_taxi_data()
