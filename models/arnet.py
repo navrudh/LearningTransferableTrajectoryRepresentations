@@ -1,13 +1,13 @@
 """
 Paper: Autoencoder Regularized Network For Driving Style Representation Learning
 
-Link: arXiv:1701.01272v1
+Reference: arXiv:1701.01272v1
 """
 
 import torch.nn
 
 
-class ARNet(torch.nn.Module):
+class ARNetReconstructionLoss(torch.nn.Module):
     def __init__(self, input_size, hidden_size, num_classes, batch_first=True, dropout=0.5):
         super().__init__()
         self.input_size = input_size
@@ -19,7 +19,7 @@ class ARNet(torch.nn.Module):
         self.dropout = torch.nn.Dropout(dropout)
         self.fc1 = torch.nn.Linear(in_features=hidden_size, out_features=64)
         self.fc2 = torch.nn.Linear(64, hidden_size)
-        self.fc3 = torch.nn.Linear(in_features=hidden_size, out_features=num_classes)
+        # self.fc3 = torch.nn.Linear(in_features=hidden_size, out_features=num_classes)
         # self.reconstruction_loss = torch.nn.MSELoss()
         # self.classification_loss = torch.nn.CrossEntropyLoss()
         self.relu = torch.nn.ReLU(inplace=True)
@@ -31,5 +31,5 @@ class ARNet(torch.nn.Module):
         h_last_layer = h_n.view(-1, 2, self.hidden_size)[:, -1, :]
         x_hat: torch.Tensor = self.dropout(h_last_layer)
         rec: torch.Tensor = self.tanh(self.fc2(self.relu(self.fc1(x_hat))))
-        y_pred: torch.Tensor = self.fc3(x_hat)
-        return x_hat, rec, y_pred
+        # y_pred: torch.Tensor = self.fc3(x_hat)
+        return x_hat, rec  #, y_pred

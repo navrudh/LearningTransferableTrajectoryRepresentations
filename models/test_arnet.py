@@ -4,12 +4,12 @@ import unittest
 import torch
 from torch.nn.utils.rnn import pack_sequence
 
-from models.arnet import ARNet
+from models.arnet import ARNetReconstructionLoss
 
 
 class ArnetTest(unittest.TestCase):
     def setUp(self) -> None:
-        self.model = ARNet(input_size=35, hidden_size=128, num_classes=5)
+        self.model = ARNetReconstructionLoss(input_size=35, hidden_size=128, num_classes=5)
 
     def testValidInput(self):
         batch_sz = 5

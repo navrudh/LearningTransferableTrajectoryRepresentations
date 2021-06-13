@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 import torch
 from torch.nn.utils.rnn import pack_sequence
@@ -12,7 +13,7 @@ class FrameEncodedPortoTaxiDataset(Dataset):
         return len(self.porto_df)
 
     def __getitem__(self, idx):
-        return torch.from_numpy(self.porto_df.iloc[idx, 1]), self.porto_df.iloc[idx, 0]
+        return torch.from_numpy(np.copy(self.porto_df.iloc[idx, 1])), self.porto_df.iloc[idx, 0]
 
 
 def collate_fn_porto(data):
@@ -22,4 +23,5 @@ def collate_fn_porto(data):
              and label/length are scalars
     """
     trajectories, drivers = zip(*data)
-    return pack_sequence(trajectories, enforce_sorted=False).float(), torch.tensor(drivers)
+    lengths = torch.tensor([t.shape[0] for t in trajectories])
+    return pack_sequence(trajectories, enforce_sorted=False).float(), lengths, torch.tensor(drivers)
