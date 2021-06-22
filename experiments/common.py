@@ -1,12 +1,13 @@
 import math
+from typing import List, Optional, Union
 
 import pytorch_lightning as pl
 from torch.utils.data import DataLoader, random_split
 
-from datasets.taxi_porto import FrameEncodedPortoTaxiDataset, collate_fn_porto
+from datasets.taxi_porto import collate_fn_porto, FrameEncodedPortoTaxiDataset
 
 
-def run_experiment(model: pl.LightningModule):
+def run_experiment(model: pl.LightningModule, gpus: Optional[Union[List[int], str, int]] = 1):
     # data
     dataset = FrameEncodedPortoTaxiDataset('../data/train-preprocessed-taxi.pkl')
     train_size = int(math.ceil(len(dataset) * 0.7))
@@ -15,5 +16,5 @@ def run_experiment(model: pl.LightningModule):
     val_loader = DataLoader(val_dataset, batch_size=1024, collate_fn=collate_fn_porto, num_workers=8)
 
     # training
-    trainer = pl.Trainer(gpus=1, max_epochs=10)
+    trainer = pl.Trainer(gpus=gpus, max_epochs=10)
     trainer.fit(model, train_loader, val_loader)

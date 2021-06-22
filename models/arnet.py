@@ -32,4 +32,4 @@ class ARNetReconstructionLoss(torch.nn.Module):
         x_hat: torch.Tensor = self.dropout(h_last_layer)
         rec: torch.Tensor = self.tanh(self.fc2(self.relu(self.fc1(x_hat))))
         # y_pred: torch.Tensor = self.fc3(x_hat)
-        return x_hat, rec  #, y_pred
+        return x_hat, rec  # , y_pred

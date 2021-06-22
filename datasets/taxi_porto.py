@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 import pandas as pd
 import torch
@@ -7,7 +9,7 @@ from torch.utils.data import Dataset
 
 class FrameEncodedPortoTaxiDataset(Dataset):
     def __init__(self, pickle_file):
-        self.porto_df = pd.read_pickle(pickle_file)
+        self.porto_df = pd.read_pickle(os.path.realpath(pickle_file))
 
     def __len__(self):
         return len(self.porto_df)
@@ -24,4 +26,6 @@ def collate_fn_porto(data):
     """
     trajectories, drivers = zip(*data)
     lengths = torch.tensor([t.shape[0] for t in trajectories])
-    return pack_sequence(trajectories, enforce_sorted=False).float(), lengths, torch.tensor(drivers)
+    return pack_sequence(trajectories,
+                         enforce_sorted=False).float(), pack_sequence(trajectories,
+                                                                      enforce_sorted=False).float(), lengths
