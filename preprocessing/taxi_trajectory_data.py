@@ -33,6 +33,7 @@ def prepare_taxi_data(seq_len=256, window_len=32):
     train_df['POLYLINE'] = train_df['POLYLINE'].transform(lambda s: sliding_window(json.loads(s), seq_len, window_len))
     train_df = train_df[train_df['POLYLINE'].map(len) > 0]
     train_df = train_df.explode('POLYLINE')
+    normalize_global_metrics(train_df)
     train_df.to_pickle(file_path)
 
 
@@ -94,9 +95,14 @@ def calc_feature_stat_matrix(arr: np.ndarray):
     )
 
 
-def apply_sliding_window_to_polyline(df: pd.DataFrame):
-    df['POLYLINE'].apply(lambda s: json.loads(s))
-    return df
+def normalize_global_metrics(df: pd.DataFrame):
+    _mean = df['POLYLINE'].transform(lambda arr: np.mean(arr, 0, keepdims=True)).to_numpy().mean()
+    _std = df['POLYLINE'].transform(lambda arr: np.mean(arr, 0, keepdims=True)).to_numpy().std()
+    df['POLYLINE'] = df['POLYLINE'].transform(lambda arr: (arr - _mean) / _std)
+
+
+def normalize_local_metrics(df: pd.DataFrame):
+    df['POLYLINE'] = df['POLYLINE'].transform(lambda arr: (arr - np.mean(arr, 0)) / np.std(arr, 0))
 
 
 if __name__ == '__main__':
