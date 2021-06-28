@@ -56,9 +56,15 @@ def prepare_taxi_data(seq_len=256, window_len=32):
     val_df = val_df[val_df['POLYLINE'].map(len) > 0]
     val_df['POLYLINE_G'] = val_df['POLYLINE'].transform(lambda s: apply_gaussian_noise(s))
     val_df['POLYLINE_DS'] = val_df['POLYLINE'].transform(lambda s: apply_downsampling(s))
-    val_df['POLYLINE'] = val_df['POLYLINE'].transform(lambda s: sliding_window(s, seq_len, window_len)[0])
-    val_df['POLYLINE_G'] = val_df['POLYLINE_G'].transform(lambda s: sliding_window(s, seq_len, window_len)[0])
-    val_df['POLYLINE_DS'] = val_df['POLYLINE_DS'].transform(lambda s: sliding_window(s, seq_len, window_len)[0])
+    val_df['POLYLINE'] = val_df['POLYLINE'].transform(lambda s: sliding_window(s, seq_len, window_len))
+    val_df['POLYLINE_G'] = val_df['POLYLINE_G'].transform(lambda s: sliding_window(s, seq_len, window_len))
+    val_df['POLYLINE_DS'] = val_df['POLYLINE_DS'].transform(lambda s: sliding_window(s, seq_len, window_len))
+    val_df = val_df[val_df['POLYLINE'].map(len) > 0]
+    val_df = val_df[val_df['POLYLINE_G'].map(len) > 0]
+    val_df = val_df[val_df['POLYLINE_DS'].map(len) > 0]
+    val_df['POLYLINE'] = val_df['POLYLINE'].transform(lambda arr: arr[0])
+    val_df['POLYLINE_G'] = val_df['POLYLINE_G'].transform(lambda arr: arr[0])
+    val_df['POLYLINE_DS'] = val_df['POLYLINE_DS'].transform(lambda arr: arr[0])
 
     # normalization
     val_df['POLYLINE'] = val_df['POLYLINE'].transform(lambda arr: (arr - tr_mean) / tr_std)
