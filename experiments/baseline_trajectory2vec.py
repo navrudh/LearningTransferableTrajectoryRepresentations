@@ -34,10 +34,10 @@ class BaselineTrajectory2VecExperiment(pl.LightningModule):
         latent_orig = self.forward(orig, orig, is_train=False)
         latent_gauss = self.forward(gauss, gauss, is_train=False)
         latent_ds = self.forward(ds, ds, is_train=False)
-        loss_gauss = F.mse_loss(latent_orig, latent_gauss)
-        loss_ds = F.mse_loss(latent_orig, latent_ds)
-        self.log('loss_gaussian_noise', loss_gauss)
-        self.log('loss_downsampling', loss_ds)
+        loss_gauss = F.mse_loss(latent_orig, latent_gauss, reduction='sum')
+        loss_ds = F.mse_loss(latent_orig, latent_ds, reduction='sum')
+        self.log('loss_gaussian_noise', loss_gauss, prog_bar=True, on_epoch=True)
+        self.log('loss_downsampling', loss_ds, prog_bar=True, on_epoch=True)
 
 
 if __name__ == '__main__':
