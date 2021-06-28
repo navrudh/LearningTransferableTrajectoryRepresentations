@@ -73,7 +73,7 @@ class EncoderDecoder(nn.Module):
         else:
             return h
 
-    def forward(self, src, trg):
+    def forward(self, src, trg, is_train=True):
         """
         Input:
         src (src_seq_len, batch): source tensor
@@ -86,6 +86,10 @@ class EncoderDecoder(nn.Module):
         """
         encoder_output, encoder_hn = self.encoder(src)
         decoder_h0 = self.encoder_hn2decoder_h0(encoder_hn)
+
+        if not is_train:
+            return decoder_h0
+
         output, decoder_hn = self.decoder(trg, decoder_h0)
         output = pad_packed_sequence(output)[0]
         output = self.fc(output)

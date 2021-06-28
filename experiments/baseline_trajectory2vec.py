@@ -14,8 +14,8 @@ class BaselineTrajectory2VecExperiment(pl.LightningModule):
         super().__init__()
         self.model = EncoderDecoder(input_size=35, hidden_size=256, num_layers=2, dropout=0.2, bidirectional=False)
 
-    def forward(self, src, tgt):
-        return self.model.forward(src, tgt)
+    def forward(self, src, tgt, is_train: bool):
+        return self.model.forward(src, tgt, is_train)
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
@@ -23,11 +23,21 @@ class BaselineTrajectory2VecExperiment(pl.LightningModule):
 
     def training_step(self, train_batch: Tuple[PackedSequence, PackedSequence, List[int]], batch_idx):
         src, tgt, lengths = train_batch
-        x_hat = self.forward(src, tgt)
+        x_hat = self.forward(src, tgt, is_train=True)
         x = pad_packed_sequence(src)[0]
         loss = F.mse_loss(x, x_hat)
         self.log('train_loss', loss)
         return loss
+
+    def val_step(self, val_batch, batch_idx):
+        orig, gauss, ds = val_batch
+        latent_orig = self.forward(orig, orig, is_train=False)
+        latent_gauss = self.forward(gauss, gauss, is_train=False)
+        latent_ds = self.forward(ds, ds, is_train=False)
+        loss_gauss = F.mse_loss(latent_orig, latent_gauss)
+        loss_ds = F.mse_loss(latent_orig, latent_ds)
+        self.log('loss_gaussian_noise', loss_gauss)
+        self.log('loss_downsampling', loss_ds)
 
 
 if __name__ == '__main__':

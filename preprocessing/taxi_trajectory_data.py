@@ -7,6 +7,8 @@ import modin.pandas as pd
 import numpy as np
 from numpy.lib.stride_tricks import as_strided
 
+from utils.gps import distort_gps_array, downsample_gps_array
+
 EPSILON = 1e-10
 FLOAT_MAX = np.iinfo(np.int64).max
 FLOAT_MIN = np.iinfo(np.int64).min
@@ -21,20 +23,39 @@ panda_types = {
     'MISSING_DATA': bool,
     'POLYLINE': str,
 }
+DOWNSAMPLING_RATES = [.1, .15, .2, .25, .3]
 
 
 def prepare_taxi_data(seq_len=256, window_len=32):
-    file_path = Path("../data/train-preprocessed-taxi.pkl")
-    if file_path.exists():
+    train_file_path = Path("../data/train-preprocessed-taxi.pkl")
+    val_file_path = Path("../data/val-preprocessed-taxi.pkl")
+    if train_file_path.exists():
         print("Preprocessed taxi data file already exists")
         return
-    train_df = pd.read_csv("../data/train.csv", dtype=panda_types, usecols=['TAXI_ID', 'POLYLINE'])
+    file_df = pd.read_csv("../data/train.csv", dtype=panda_types, usecols=['TAXI_ID', 'POLYLINE'])
+    file_df.reindex(np.random.permutation(file_df.index))
+
+    train_size = 0.9
+    train_end = int(len(file_df) * train_size)
+
+    train_df = file_df[:train_end]
+    val_df = file_df[train_end:]
+
     train_df['TAXI_ID'] = train_df['TAXI_ID'].rank(method='dense').astype(int)
     train_df['POLYLINE'] = train_df['POLYLINE'].transform(lambda s: sliding_window(json.loads(s), seq_len, window_len))
     train_df = train_df[train_df['POLYLINE'].map(len) > 0]
     train_df = train_df.explode('POLYLINE')
     normalize_global_metrics(train_df)
-    train_df.to_pickle(file_path)
+    train_df.to_pickle(train_file_path)
+
+    val_df['POLYLINE'] = val_df['POLYLINE'].transform(lambda s: json.loads(s)[:seq_len])
+    val_df = val_df[val_df['POLYLINE'].map(len) > 0]
+    val_df['POLYLINE_G'] = val_df['POLYLINE'].transform(lambda s: apply_gaussian_noise(s))
+    val_df['POLYLINE_SS'] = val_df['POLYLINE'].transform(lambda s: apply_downsampling(s))
+    val_df['POLYLINE'] = val_df['POLYLINE'].transform(lambda s: sliding_window(s, seq_len, window_len)[0])
+    val_df['POLYLINE_G'] = val_df['POLYLINE_G'].transform(lambda s: sliding_window(s, seq_len, window_len)[0])
+    val_df['POLYLINE_SS'] = val_df['POLYLINE_SS'].transform(lambda s: sliding_window(s, seq_len, window_len)[0])
+    val_df.to_pickle(val_file_path)
 
 
 def sliding_window(lst: List, window_size: int, slide_step: int):
@@ -103,6 +124,17 @@ def normalize_global_metrics(df: pd.DataFrame):
 
 def normalize_local_metrics(df: pd.DataFrame):
     df['POLYLINE'] = df['POLYLINE'].transform(lambda arr: (arr - np.mean(arr, 0)) / np.std(arr, 0))
+
+
+def apply_gaussian_noise(lst: List):
+    trip = distort_gps_array(lst, .22, 50)
+    trip[0] = lst[0]
+    trip[-1] = lst[-1]
+    return trip
+
+
+def apply_downsampling(lst: List):
+    return downsample_gps_array(lst, rate=DOWNSAMPLING_RATES[np.random.random_integers(0, 4)])
 
 
 if __name__ == '__main__':
