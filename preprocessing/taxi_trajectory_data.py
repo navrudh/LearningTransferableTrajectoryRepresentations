@@ -33,28 +33,37 @@ def prepare_taxi_data(seq_len=256, window_len=32):
         print("Preprocessed taxi data file already exists")
         return
     file_df = pd.read_csv("../data/train.csv", dtype=panda_types, usecols=['TAXI_ID', 'POLYLINE'])
-    file_df.reindex(np.random.permutation(file_df.index))
 
+    # shuffle and split
+    file_df.reindex(np.random.permutation(file_df.index))
     train_size = 0.9
     train_end = int(len(file_df) * train_size)
-
     train_df = file_df[:train_end]
     val_df = file_df[train_end:]
 
+    # build train
     train_df['TAXI_ID'] = train_df['TAXI_ID'].rank(method='dense').astype(int)
     train_df['POLYLINE'] = train_df['POLYLINE'].transform(lambda s: sliding_window(json.loads(s), seq_len, window_len))
     train_df = train_df[train_df['POLYLINE'].map(len) > 0]
     train_df = train_df.explode('POLYLINE')
-    normalize_global_metrics(train_df)
+    # normalization
+    tr_mean, tr_std = compute_mean_std(train_df)
+    train_df['POLYLINE'] = train_df['POLYLINE'].transform(lambda arr: (arr - tr_mean) / tr_std)
     train_df.to_pickle(train_file_path)
 
+    # build val
     val_df['POLYLINE'] = val_df['POLYLINE'].transform(lambda s: json.loads(s)[:seq_len])
     val_df = val_df[val_df['POLYLINE'].map(len) > 0]
     val_df['POLYLINE_G'] = val_df['POLYLINE'].transform(lambda s: apply_gaussian_noise(s))
-    val_df['POLYLINE_SS'] = val_df['POLYLINE'].transform(lambda s: apply_downsampling(s))
+    val_df['POLYLINE_DS'] = val_df['POLYLINE'].transform(lambda s: apply_downsampling(s))
     val_df['POLYLINE'] = val_df['POLYLINE'].transform(lambda s: sliding_window(s, seq_len, window_len)[0])
     val_df['POLYLINE_G'] = val_df['POLYLINE_G'].transform(lambda s: sliding_window(s, seq_len, window_len)[0])
-    val_df['POLYLINE_SS'] = val_df['POLYLINE_SS'].transform(lambda s: sliding_window(s, seq_len, window_len)[0])
+    val_df['POLYLINE_DS'] = val_df['POLYLINE_DS'].transform(lambda s: sliding_window(s, seq_len, window_len)[0])
+
+    # normalization
+    val_df['POLYLINE'] = val_df['POLYLINE'].transform(lambda arr: (arr - tr_mean) / tr_std)
+    val_df['POLYLINE_G'] = val_df['POLYLINE_G'].transform(lambda arr: (arr - tr_mean) / tr_std)
+    val_df['POLYLINE_DS'] = val_df['POLYLINE_DS'].transform(lambda arr: (arr - tr_mean) / tr_std)
     val_df.to_pickle(val_file_path)
 
 
@@ -116,10 +125,11 @@ def calc_feature_stat_matrix(arr: np.ndarray):
     )
 
 
-def normalize_global_metrics(df: pd.DataFrame):
+def compute_mean_std(df: pd.DataFrame):
     _mean = df['POLYLINE'].transform(lambda arr: np.mean(arr, 0, keepdims=True)).to_numpy().mean()
     _std = df['POLYLINE'].transform(lambda arr: np.mean(arr, 0, keepdims=True)).to_numpy().std()
-    df['POLYLINE'] = df['POLYLINE'].transform(lambda arr: (arr - _mean) / _std)
+    # df['POLYLINE'] = df['POLYLINE'].transform(lambda arr: (arr - _mean) / _std)
+    return _mean, _std
 
 
 def normalize_local_metrics(df: pd.DataFrame):
@@ -134,7 +144,7 @@ def apply_gaussian_noise(lst: List):
 
 
 def apply_downsampling(lst: List):
-    return downsample_gps_array(lst, rate=DOWNSAMPLING_RATES[np.random.random_integers(0, 4)])
+    return downsample_gps_array(lst, rate=DOWNSAMPLING_RATES[np.random.randint(0, 4 + 1)])
 
 
 if __name__ == '__main__':

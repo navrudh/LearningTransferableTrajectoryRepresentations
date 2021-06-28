@@ -9,6 +9,7 @@ def downsample_gps_array(trip: List[Tuple[float]], rate: float):
         if np.random.rand() > rate:
             ds_trip.append(trip[i])
     ds_trip.append(trip[-1])
+    return ds_trip
 
 
 def distort_gps_array(trip: List[Tuple[float]], rate: float, radius=50.0):
@@ -35,5 +36,5 @@ def meters2lonlat(x: float, y: float):
     semimajoraxis = 6378137.0
     lon = x / semimajoraxis / 0.017453292519943295
     t = np.exp(y / 3189068.5)
-    lat = np.asin((t - 1) / (t + 1)) / 0.017453292519943295
+    lat = np.arcsin((t - 1) / (t + 1)) / 0.017453292519943295
     return lon, lat

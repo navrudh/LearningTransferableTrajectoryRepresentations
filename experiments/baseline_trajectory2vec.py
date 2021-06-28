@@ -29,7 +29,7 @@ class BaselineTrajectory2VecExperiment(pl.LightningModule):
         self.log('train_loss', loss)
         return loss
 
-    def val_step(self, val_batch, batch_idx):
+    def validation_step(self, val_batch, batch_idx):
         orig, gauss, ds = val_batch
         latent_orig = self.forward(orig, orig, is_train=False)
         latent_gauss = self.forward(gauss, gauss, is_train=False)

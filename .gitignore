@@ -38,6 +38,7 @@ ENV/
 
 # Pytorch
 lightning_logs
+logs
 
 # app specific
 data
