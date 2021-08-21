@@ -24,7 +24,7 @@ def distort_gps_array(trip: List[Tuple[float]], rate: float, radius=50.0):
     return noisetrip
 
 
-def lonlat2meters(lon: float, lat: float):
+def lonlat2meters(lon: np.array, lat: np.array) -> Tuple[np.array, np.array]:
     semimajoraxis = 6378137.0
     east = lon * 0.017453292519943295
     north = lat * 0.017453292519943295
@@ -32,7 +32,7 @@ def lonlat2meters(lon: float, lat: float):
     return semimajoraxis * east, 3189068.5 * np.log((1 + t) / (1 - t))
 
 
-def meters2lonlat(x: float, y: float):
+def meters2lonlat(x: np.array, y: np.array) -> Tuple[np.array, np.array]:
     semimajoraxis = 6378137.0
     lon = x / semimajoraxis / 0.017453292519943295
     t = np.exp(y / 3189068.5)
