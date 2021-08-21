@@ -88,13 +88,19 @@ def prepare_taxi_data(in_file: str, train_file_prefix: str, val_file_prefix: str
     # val_df.to_pickle(val_file_path)
 
 
-def gps2meters(lst: List):
-    arr = np.array(lst, dtype=np.float32)
+def gps2meters(polyline: List):
+    if len(polyline) == 0 or polyline is None:
+        return None
+
+    arr = np.array(polyline, dtype=np.float32)
     x, y = lonlat2meters(arr[:, 0], arr[:, 1])
     return np.vstack((x, y)).T
 
 
 def sliding_window(arr: np.array, window_size_seconds: int, slide_step_seconds: int):
+    if arr is None:
+        return []
+
     window_size = window_size_seconds // SAMPLE_RATE
     slide_step = slide_step_seconds // SAMPLE_RATE
     output_len = 1 + max(0, int(math.ceil((arr.shape[0] - window_size) / slide_step)))
