@@ -199,8 +199,8 @@ if __name__ == '__main__':
 
     prepare_taxi_data(
         in_file="../data/train.csv",
-        train_file_prefix="../data/preprocessed-trajectory2vec-porto-train",
-        val_file_prefix="../data/preprocessed-trajectory2vec-porto-val",
-        seq_len=600,
-        window_len=300
+        train_file_prefix="../data/preprocessed-trajectory2vec-train-train",
+        val_file_prefix="../data/preprocessed-trajectory2vec-train-val",
+        seq_len=240,
+        window_len=120
     )
