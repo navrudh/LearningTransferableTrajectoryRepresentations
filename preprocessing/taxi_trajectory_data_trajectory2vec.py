@@ -1,3 +1,9 @@
+"""
+
+Preparing trajectory2vec data similar to t2vec, to run identical experiments
+
+"""
+
 import json
 import math
 import pickle
@@ -35,57 +41,79 @@ def get_metadata_file(path):
     return Path(f"{path}.metadata.pkl")
 
 
-def prepare_taxi_data(in_file: str, train_file_prefix: str, val_file_prefix: str, seq_len=600, window_len=300):
-    if get_dataset_file(train_file_prefix).exists():
+def get_database_file(path):
+    return Path(f"{path}.query_database.pkl")
+
+
+def get_query_file(path):
+    return Path(f"{path}.query.pkl")
+
+
+def prepare_taxi_data(in_file: str, out_prefix: str, seq_len=600, window_len=300):
+    train_prefix = out_prefix + ".train"
+    val_prefix = out_prefix + ".val"
+    test_prefix = out_prefix + ".test"
+
+    if get_dataset_file(train_prefix).exists():
         print("Preprocessed taxi data file already exists")
         return
     file_df = pd.read_csv(in_file, dtype=panda_types, usecols=['POLYLINE'])
 
     metadata = {}
-    # shuffle and split
-    # file_df.reindex(np.random.permutation(file_df.index))
-    # train_size = 0.9
-    # train_end = int(len(file_df) * train_size)
-    train_df = file_df
-    # val_df = file_df[train_end:]
 
-    # build train
-    # train_df['TAXI_ID'] = train_df['TAXI_ID'].rank(method='dense').astype(int)
-    # train_df['POLYLINE'] = train_df['POLYLINE'].transform(lambda s: gps2meters(json.loads(s)))
-    train_df['POLYLINE'] = train_df['POLYLINE'].transform(
-        lambda s: sliding_window(gps2meters(json.loads(s)), seq_len, window_len)
+    file_df['POLYLINE'] = file_df['POLYLINE'].transform(
+        lambda s: json.loads(s)
     )
-    train_df = train_df[train_df['POLYLINE'].map(len) > 0]
-    # train_df = train_df.explode('POLYLINE')
+    file_df = file_df[file_df['POLYLINE'].map(len) >= 30]
+
+    # shuffle and split
+    train_size = 800_000
+    train_df = file_df[:train_size]
+    test_df = file_df[train_size:]
+
+    train_df['POLYLINE'] = train_df['POLYLINE'].transform(
+        lambda gps_list: sliding_window(gps2meters(gps_list), seq_len, window_len)
+    )
+
     # normalization
     tr_min, tr_max = compute_min_max(train_df)
     tr_diff = tr_max - tr_min
     metadata["train_min"] = tr_min
     metadata["train_max"] = tr_max
-    pickle.dump(metadata, open(get_metadata_file(train_file_prefix), "wb"))
+    pickle.dump(metadata, open(get_metadata_file(train_prefix), "wb"))
     train_df['POLYLINE'] = train_df['POLYLINE'].transform(lambda arr: (arr - tr_min) / tr_diff)
-    train_df['POLYLINE'].to_pickle(get_dataset_file(train_file_prefix))
+    train_df['POLYLINE'].to_pickle(get_dataset_file(train_prefix))
 
-    # build val
-    # val_df['POLYLINE'] = val_df['POLYLINE'].transform(lambda s: json.loads(s)[:seq_len])
-    # val_df = val_df[val_df['POLYLINE'].map(len) > 0]
-    # val_df['POLYLINE_G'] = val_df['POLYLINE'].transform(lambda s: apply_gaussian_noise(s))
-    # val_df['POLYLINE_DS'] = val_df['POLYLINE'].transform(lambda s: apply_downsampling(s))
-    # val_df['POLYLINE'] = val_df['POLYLINE'].transform(lambda s: sliding_window(s, seq_len, window_len))
-    # val_df['POLYLINE_G'] = val_df['POLYLINE_G'].transform(lambda s: sliding_window(s, seq_len, window_len))
-    # val_df['POLYLINE_DS'] = val_df['POLYLINE_DS'].transform(lambda s: sliding_window(s, seq_len, window_len))
-    # val_df = val_df[val_df['POLYLINE'].map(len) > 0]
-    # val_df = val_df[val_df['POLYLINE_G'].map(len) > 0]
-    # val_df = val_df[val_df['POLYLINE_DS'].map(len) > 0]
-    # val_df['POLYLINE'] = val_df['POLYLINE'].transform(lambda arr: arr[0])
-    # val_df['POLYLINE_G'] = val_df['POLYLINE_G'].transform(lambda arr: arr[0])
-    # val_df['POLYLINE_DS'] = val_df['POLYLINE_DS'].transform(lambda arr: arr[0])
+    # val
+    val_df = test_df.sample(n=10000)
+    test_df = test_df.loc[~test_df.index.isin(val_df.index)]
+    # validation prepared exactly like training data
 
-    # normalization
-    # val_df['POLYLINE'] = val_df['POLYLINE'].transform(lambda arr: (arr - tr_mean) / tr_std)
-    # val_df['POLYLINE_G'] = val_df['POLYLINE_G'].transform(lambda arr: (arr - tr_mean) / tr_std)
-    # val_df['POLYLINE_DS'] = val_df['POLYLINE_DS'].transform(lambda arr: (arr - tr_mean) / tr_std)
-    # val_df.to_pickle(val_file_path)
+    val_df['POLYLINE'] = build_behavior_matrix(val_df['POLYLINE'], seq_len, window_len, tr_min, tr_max, tr_diff)
+    val_df['POLYLINE'].to_pickle(get_dataset_file(val_prefix))
+
+    # experiment queries
+    qp = test_df.sample(n=100_000 + 10_000)
+    q = qp[:10_000]
+    p = qp[10_000:]
+
+    q_a, q_b = get_subtrajectories(q)
+    p_a, p_b = get_subtrajectories(p)
+    query_db = pd.concat(q_b, p_a, p_b)
+
+    q_a = build_behavior_matrix(q_a, seq_len, window_len, tr_min, tr_max, tr_diff)
+    q_a.to_pickle(get_query_file(test_prefix))
+
+    query_db = build_behavior_matrix(query_db, seq_len, window_len, tr_min, tr_max, tr_diff)
+    query_db.to_pickle(get_database_file(test_prefix))
+
+
+def build_behavior_matrix(df, seq_len, window_len, tr_min, tr_max, tr_diff):
+    df = df.transform(
+        lambda gps_list: sliding_window(gps2meters(gps_list), seq_len, window_len)
+    )
+    df = df.transform(lambda arr: (arr - tr_min) / tr_diff)
+    return df
 
 
 def gps2meters(polyline: List):
@@ -191,6 +219,12 @@ def apply_downsampling(lst: List):
     return downsample_gps_array(lst, rate=DOWNSAMPLING_RATES[np.random.randint(0, 4 + 1)])
 
 
+def get_subtrajectories(df: pd.DataFrame):
+    df_a = df['POLYLINE'].transform(lambda polyline_list: polyline_list[::2])
+    df_b = df['POLYLINE'].transform(lambda polyline_list: polyline_list[1::2])
+    return df_a, df_b
+
+
 if __name__ == '__main__':
     import ray
 
@@ -199,8 +233,7 @@ if __name__ == '__main__':
 
     prepare_taxi_data(
         in_file="../data/train.csv",
-        train_file_prefix="../data/preprocessed-trajectory2vec-train-train",
-        val_file_prefix="../data/preprocessed-trajectory2vec-train-val",
+        out_prefix="../data/preprocessed-trajectory2vec",
         seq_len=240,
         window_len=120
     )
