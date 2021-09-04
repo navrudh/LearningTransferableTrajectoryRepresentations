@@ -8,7 +8,6 @@ from datasets.trembr.porto_embedding import PortoIterableDataset
 
 
 class Traj2VecModeler(nn.Module):
-
     def __init__(self, vocab_size, embedding_dim):
         super(Traj2VecModeler, self).__init__()
         self.embedding_dim = embedding_dim

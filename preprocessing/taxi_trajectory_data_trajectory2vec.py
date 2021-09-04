@@ -61,9 +61,7 @@ def prepare_taxi_data(in_file: str, out_prefix: str, seq_len=600, window_len=300
 
     metadata = {}
 
-    file_df['POLYLINE'] = file_df['POLYLINE'].transform(
-        lambda s: json.loads(s)
-    )
+    file_df['POLYLINE'] = file_df['POLYLINE'].transform(lambda s: json.loads(s))
     file_df = file_df[file_df['POLYLINE'].map(len) >= 30]
 
     # shuffle and split
@@ -109,9 +107,7 @@ def prepare_taxi_data(in_file: str, out_prefix: str, seq_len=600, window_len=300
 
 
 def build_behavior_matrix(df, seq_len, window_len, tr_min, tr_max, tr_diff):
-    df = df.transform(
-        lambda gps_list: sliding_window(gps2meters(gps_list), seq_len, window_len)
-    )
+    df = df.transform(lambda gps_list: sliding_window(gps2meters(gps_list), seq_len, window_len))
     df = df.transform(lambda arr: (arr - tr_min) / tr_diff)
     return df
 
@@ -232,8 +228,5 @@ if __name__ == '__main__':
     ray.init()
 
     prepare_taxi_data(
-        in_file="../data/train.csv",
-        out_prefix="../data/train-trajectory2vec",
-        seq_len=240,
-        window_len=120
+        in_file="../data/train.csv", out_prefix="../data/train-trajectory2vec", seq_len=240, window_len=120
     )

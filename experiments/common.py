@@ -9,7 +9,7 @@ from datasets.taxi_porto import collate_fn_porto, FrameEncodedPortoTaxiDataset
 
 
 def run_experiment(
-        model: pl.LightningModule, gpus: Optional[Union[List[int], str, int]] = 1, name: Union[str, None] = None
+    model: pl.LightningModule, gpus: Optional[Union[List[int], str, int]] = 1, name: Union[str, None] = None
 ):
     if name is None:
         name = model.__class__.__name__
@@ -20,7 +20,11 @@ def run_experiment(
     val_loader = DataLoader(val_dataset, batch_size=1024, collate_fn=collate_fn_porto, num_workers=8)
 
     # training
-    trainer = pl.Trainer(gpus=gpus, max_epochs=70_000, logger=TensorBoardLogger(save_dir="../logs", name=name),
-                         callbacks=[EarlyStopping(monitor="val_loss", patience=200)])
+    trainer = pl.Trainer(
+        gpus=gpus,
+        max_epochs=70_000,
+        logger=TensorBoardLogger(save_dir="../logs", name=name),
+        callbacks=[EarlyStopping(monitor="val_loss", patience=200)]
+    )
     trainer.fit(model, train_loader, val_loader)
     return trainer

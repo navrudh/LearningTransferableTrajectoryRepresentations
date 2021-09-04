@@ -5,12 +5,10 @@ import random
 import numpy as np
 import torch.utils.data
 from torch.utils.data import DataLoader
-
 """dataset + accelerate library of Huggingface"""
 
 
 class PortoIterableDataset(torch.utils.data.IterableDataset):
-
     def __init__(self, id_edge_raw_file):
         self.data = ["1,2,3,4,5", "5,6,7"]
         self.idx2type = {}
