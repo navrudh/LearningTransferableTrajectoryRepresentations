@@ -15,7 +15,6 @@ class FrameEncodedPortoTaxiDataset(Dataset):
         return len(self.porto_df)
 
     def __getitem__(self, idx):
-        print(np.copy(self.porto_df.iloc[idx]).shape)
         return torch.from_numpy(np.copy(self.porto_df.iloc[idx])), 0
 
 

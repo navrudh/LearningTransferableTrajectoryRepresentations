@@ -99,7 +99,7 @@ def prepare_taxi_data(in_file: str, out_prefix: str, seq_len=600, window_len=300
 
     q_a, q_b = get_subtrajectories(q)
     p_a, p_b = get_subtrajectories(p)
-    query_db = pd.concat(q_b, p_a, p_b)
+    query_db = pd.concat([q_b, p_a, p_b])
 
     q_a = build_behavior_matrix(q_a, seq_len, window_len, tr_min, tr_max, tr_diff)
     q_a.to_pickle(get_query_file(test_prefix))
@@ -233,7 +233,7 @@ if __name__ == '__main__':
 
     prepare_taxi_data(
         in_file="../data/train.csv",
-        out_prefix="../data/preprocessed-trajectory2vec",
+        out_prefix="../data/train-trajectory2vec",
         seq_len=240,
         window_len=120
     )

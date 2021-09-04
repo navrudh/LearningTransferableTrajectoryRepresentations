@@ -30,15 +30,14 @@ class BaselineTrajectory2VecExperiment(pl.LightningModule):
         return loss
 
     def validation_step(self, val_batch, batch_idx):
-        orig, gauss, ds = val_batch
-        latent_orig = self.forward(orig, orig, is_train=False)
-        latent_gauss = self.forward(gauss, gauss, is_train=False)
-        latent_ds = self.forward(ds, ds, is_train=False)
-        loss_gauss = F.mse_loss(latent_orig, latent_gauss, reduction='sum')
-        loss_ds = F.mse_loss(latent_orig, latent_ds, reduction='sum')
-        self.log('loss_gaussian_noise', loss_gauss, prog_bar=True, on_epoch=True)
-        self.log('loss_downsampling', loss_ds, prog_bar=True, on_epoch=True)
+        src, tgt, lengths = val_batch
+        x_hat = self.forward(src, tgt, is_train=True)
+        x = pad_packed_sequence(src)[0]
+        loss = F.mse_loss(x, x_hat)
+        self.log('val_loss', loss, prog_bar=True, on_epoch=True)
 
 
 if __name__ == '__main__':
-    run_experiment(model=BaselineTrajectory2VecExperiment(), gpus=[0])
+    model = BaselineTrajectory2VecExperiment()
+    trainer = run_experiment(model=model, gpus=[0])
+    trainer.save_checkpoint("trajectory2vec.ckpt")
