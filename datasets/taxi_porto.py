@@ -15,7 +15,7 @@ class FrameEncodedPortoTaxiDataset(Dataset):
         return len(self.porto_df)
 
     def __getitem__(self, idx):
-        return torch.from_numpy(np.copy(self.porto_df.iloc[idx])), 0
+        return torch.from_numpy(np.copy(self.porto_df.iloc[idx])), idx
 
 
 def collate_fn_porto(data):
