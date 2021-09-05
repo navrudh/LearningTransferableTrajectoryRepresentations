@@ -1,6 +1,7 @@
 import pickle
 
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 from datasets.taxi_porto import FrameEncodedPortoTaxiDataset
 from experiments.baseline_trajectory2vec import BaselineTrajectory2VecExperiment
@@ -19,7 +20,7 @@ def process_test(query_file, results_file, eval_model: BaselineTrajectory2VecExp
 
     test_results = []
 
-    for _, (sample, idx) in enumerate(loader):
+    for _, (sample, idx) in enumerate(tqdm(loader, desc="running query")):
         hidden = eval_model.forward(sample.double(), None, is_train=False)
         hidden = hidden.detach().numpy()[-1, -1]
         test_results.append([idx.item() + 1, hidden])

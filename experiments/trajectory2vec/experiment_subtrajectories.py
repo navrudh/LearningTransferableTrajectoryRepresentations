@@ -2,6 +2,7 @@ import pickle
 
 import numpy as np
 import pandas
+from tqdm import tqdm
 
 
 def sqeuclidean(v1, v2):
@@ -10,13 +11,14 @@ def sqeuclidean(v1, v2):
 
 
 def subtrajectory_experiment(query_results_file: str, query_database_results_file: str, m: int = 0):
+    db_size = m + 10_000
     query_results = pickle.load(open(query_results_file, "rb"))
     query_database_results = pickle.load(open(query_database_results_file, "rb"))
-    query_database_results = query_database_results[:10_000 + m]
+    query_database_results = query_database_results[:db_size]
     query_database = pandas.DataFrame(query_database_results, columns=["TRAJECTORY_ID", "VECTOR"])
 
     ranks = []
-    for _, (query_id, query_vector) in enumerate(query_results):
+    for _, (query_id, query_vector) in enumerate(tqdm(query_results, desc=f"searching query (dbsize={db_size})")):
         query_database['DISTANCE'] = query_database["VECTOR"].transform(lambda vec: sqeuclidean(query_vector, vec))
         sorted_database = query_database.sort_values(by=['DISTANCE'])
         for (idx, trajectory_id, _, _) in sorted_database.itertuples():
