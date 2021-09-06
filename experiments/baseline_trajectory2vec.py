@@ -39,5 +39,5 @@ class BaselineTrajectory2VecExperiment(pl.LightningModule):
 
 if __name__ == '__main__':
     model = BaselineTrajectory2VecExperiment()
-    trainer = run_experiment(model=model, gpus=[0])
+    trainer = run_experiment(model=model, gpus=[2])
     trainer.save_checkpoint("../data/trajectory2vec.ckpt")

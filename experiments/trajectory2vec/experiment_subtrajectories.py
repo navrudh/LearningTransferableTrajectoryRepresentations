@@ -23,8 +23,8 @@ def subtrajectory_experiment(query_results_file: str, query_database_results_fil
         # query_database['DISTANCE'] = query_database["VECTOR"].transform(lambda vec: sqeuclidean(query_vector, vec))
         # sorted_database = query_database.sort_values(by=['DISTANCE'])
 
-        sorted_db = [db_result + [sqeuclidean(query_vector, db_result[1])] for db_result in query_database_results]
-        sorted_db.sort(key=lambda res: res[-1])
+        sorted_db = [db_result + [sqeuclidean(query_vector, db_result[-1])] for db_result in query_database_results]
+        sorted_db.sort(key=lambda entry: entry[-1])
 
         # ranks.append(sorted_database[sorted_database['TRAJECTORY_ID'] == query_id].index.values[0] + 1)
         # for (idx, trajectory_id, _, _) in sorted_database.itertuples():
@@ -42,7 +42,7 @@ def subtrajectory_experiment(query_results_file: str, query_database_results_fil
 if __name__ == '__main__':
     for dbsize in [20000, 40000, 60000, 80000, 100000]:
         subtrajectory_experiment(
-            query_results_file="../../data/train-trajectory2vec.test.query.results.pkl",
-            query_database_results_file="../../data/train-trajectory2vec.test.query_database.results.pkl",
+            query_results_file="../../data/sample-trajectory2vec.test.query.results.pkl",
+            query_database_results_file="../../data/sample-trajectory2vec.test.query_database.results.pkl",
             m=dbsize
         )

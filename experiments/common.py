@@ -17,14 +17,14 @@ def run_experiment(
     train_dataset = FrameEncodedPortoTaxiDataset('../data/train-trajectory2vec.train.dataframe.pkl')
     val_dataset = FrameEncodedPortoTaxiDataset('../data/train-trajectory2vec.val.dataframe.pkl')
     train_loader = DataLoader(train_dataset, batch_size=2048, collate_fn=collate_fn_porto, shuffle=True, num_workers=10)
-    val_loader = DataLoader(val_dataset, batch_size=2048, collate_fn=collate_fn_porto, shuffle=True, num_workers=10)
+    val_loader = DataLoader(val_dataset, batch_size=2048, collate_fn=collate_fn_porto, num_workers=10)
 
     # training
     trainer = pl.Trainer(
         gpus=gpus,
-        max_epochs=200,
+        max_epochs=2000,
         logger=TensorBoardLogger(save_dir="../logs", name=name),
-        callbacks=[EarlyStopping(monitor="val_loss", patience=5)]
+        callbacks=[EarlyStopping(monitor="val_loss", patience=200)]
     )
     trainer.fit(model, train_loader, val_loader)
     return trainer
