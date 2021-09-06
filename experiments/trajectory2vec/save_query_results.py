@@ -15,6 +15,14 @@ def load_eval_model(path: str):
 
 
 def process_test(query_file, results_file, eval_model: BaselineTrajectory2VecExperiment):
+    """
+    Save the output of the last hidden layer
+
+    :param query_file: queries extracted from the test set
+    :param results_file: file to save the hidden state
+    :param eval_model: the model that processes queries to results
+    :return: None
+    """
     dataset = FrameEncodedPortoTaxiDataset(query_file)
     loader = DataLoader(dataset)
 
