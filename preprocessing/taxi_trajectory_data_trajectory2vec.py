@@ -2,6 +2,8 @@
 
 Preparing trajectory2vec data similar to t2vec, to run identical experiments
 
+script version: v2
+
 """
 
 import json
@@ -30,7 +32,7 @@ panda_types = {
     'POLYLINE': str,
 }
 DOWNSAMPLING_RATES = [.1, .15, .2, .25, .3]
-SAMPLE_RATE = 15  # gps coordinated are sampled every 15 seconds
+DATASET_SAMPLE_RATE = 15  # gps coordinated are sampled every 15 seconds
 
 
 def get_dataset_file(path):
@@ -54,15 +56,13 @@ def prepare_taxi_data(in_file: str, out_prefix: str, seq_len=600, window_len=300
     val_prefix = out_prefix + ".val"
     test_prefix = out_prefix + ".test"
 
-    if get_dataset_file(train_prefix).exists():
-        print("Preprocessed taxi data file already exists")
-        return
     file_df = pd.read_csv(in_file, dtype=panda_types, usecols=['POLYLINE'])
 
     metadata = {}
 
     file_df['POLYLINE'] = file_df['POLYLINE'].transform(lambda s: json.loads(s))
     file_df = file_df[file_df['POLYLINE'].map(len) >= 30]
+    file_df['POLYLINE'] = file_df['POLYLINE'].transform(lambda gps_list: gps2meters(gps_list))
 
     # shuffle and split
     train_size = 800_000
@@ -70,7 +70,7 @@ def prepare_taxi_data(in_file: str, out_prefix: str, seq_len=600, window_len=300
     test_df = file_df[train_size:]
 
     train_df['POLYLINE'] = train_df['POLYLINE'].transform(
-        lambda gps_list: sliding_window(gps2meters(gps_list), seq_len, window_len)
+        lambda gps_meter_list: sliding_window(gps_meter_list, seq_len, window_len)
     )
 
     # normalization
@@ -80,10 +80,11 @@ def prepare_taxi_data(in_file: str, out_prefix: str, seq_len=600, window_len=300
     metadata["train_max"] = tr_max
     pickle.dump(metadata, open(get_metadata_file(train_prefix), "wb"))
     train_df['POLYLINE'] = train_df['POLYLINE'].transform(lambda arr: (arr - tr_min) / tr_diff)
+
     train_df['POLYLINE'].to_pickle(get_dataset_file(train_prefix))
 
     # val
-    val_df = test_df.sample(n=10000)
+    val_df = test_df.sample(n=10_000)
     test_df = test_df.loc[~test_df.index.isin(val_df.index)]
     # validation prepared exactly like training data
 
@@ -91,13 +92,15 @@ def prepare_taxi_data(in_file: str, out_prefix: str, seq_len=600, window_len=300
     val_df['POLYLINE'].to_pickle(get_dataset_file(val_prefix))
 
     # experiment queries
+    # q - query trajectories
+    # p - additional traj from the test set
     qp = test_df.sample(n=100_000 + 10_000)
     q = qp[:10_000]
     p = qp[10_000:]
 
     q_a, q_b = get_subtrajectories(q)
     p_a, p_b = get_subtrajectories(p)
-    query_db = pd.concat([q_b, p_a, p_b])
+    query_db = pd.concat([q_b, p_a])  # p_b is ignored as we need only 100_000 traj
 
     q_a = build_behavior_matrix(q_a, seq_len, window_len, tr_min, tr_max, tr_diff)
     q_a.to_pickle(get_query_file(test_prefix))
@@ -107,7 +110,7 @@ def prepare_taxi_data(in_file: str, out_prefix: str, seq_len=600, window_len=300
 
 
 def build_behavior_matrix(df, seq_len, window_len, tr_min, tr_max, tr_diff):
-    df = df.transform(lambda gps_list: sliding_window(gps2meters(gps_list), seq_len, window_len))
+    df = df.transform(lambda gps_meter_list: sliding_window(gps_meter_list, seq_len, window_len))
     df = df.transform(lambda arr: (arr - tr_min) / tr_diff)
     return df
 
@@ -118,15 +121,17 @@ def gps2meters(polyline: List):
 
     arr = np.array(polyline, dtype=np.float32)
     x, y = lonlat2meters(arr[:, 0], arr[:, 1])
-    return np.vstack((x, y)).T
+    timesteps = np.arange(len(polyline)) * DATASET_SAMPLE_RATE
+    return np.vstack((x, y, timesteps)).T
 
 
 def sliding_window(arr: np.array, window_size_seconds: int, slide_step_seconds: int):
     if arr is None:
         return []
 
-    window_size = window_size_seconds // SAMPLE_RATE
-    slide_step = slide_step_seconds // SAMPLE_RATE
+    actual_sample_rate = int(arr[1, 2] - arr[0, 2])
+    window_size = window_size_seconds // actual_sample_rate
+    slide_step = slide_step_seconds // actual_sample_rate
     output_len = 1 + max(0, int(math.ceil((arr.shape[0] - window_size) / slide_step)))
     """
     make sure windowing does not need padding
@@ -146,15 +151,16 @@ def sliding_window(arr: np.array, window_size_seconds: int, slide_step_seconds: 
 
 
 def calc_car_movement_features(arr: np.array):
-    if arr.shape[0] < 4:
+    if arr.shape[0] <= 2:
         return None
 
-    gps_pos = arr
-    seq_len, dim = gps_pos.shape
-    result_seq_len = seq_len - 3
+    gps_pos = arr[:, [0, 1]]
+    timesteps = arr[:, 2]
+    seq_len = gps_pos.shape[0]
+    time_diff = timesteps[1:] - timesteps[:-1]
 
-    velocity = gps_pos[1:] - gps_pos[:-1]
-    velocity_norm = np.linalg.norm(gps_pos[1:] - gps_pos[:-1], axis=1)
+    velocity = np.divide(gps_pos[1:] - gps_pos[:-1], time_diff[:, np.newaxis])
+    velocity_norm = np.linalg.norm(gps_pos[1:] - gps_pos[:-1], axis=1) / time_diff
     diff_velocity_norm = velocity_norm[1:] - velocity_norm[:-1]
     acceleration_norm = np.linalg.norm(velocity[1:] - velocity[:-1], axis=1)
     diff_acceleration_norm = acceleration_norm[1:] - acceleration_norm[:-1]
@@ -162,8 +168,12 @@ def calc_car_movement_features(arr: np.array):
 
     return np.column_stack(
         (
-            velocity_norm[:result_seq_len], diff_velocity_norm[:result_seq_len], acceleration_norm[:result_seq_len],
-            diff_acceleration_norm[:result_seq_len], angular_velocity[:result_seq_len]
+            timesteps,
+            np.pad(velocity_norm, (seq_len - velocity_norm.shape[0], 0), 'constant'),
+            np.pad(diff_velocity_norm, (seq_len - diff_velocity_norm.shape[0], 0), 'constant'),
+            np.pad(acceleration_norm, (seq_len - acceleration_norm.shape[0], 0), 'constant'),
+            np.pad(diff_acceleration_norm, (seq_len - diff_acceleration_norm.shape[0], 0), 'constant'),
+            np.pad(angular_velocity, (seq_len - angular_velocity.shape[0], 0), 'constant'),
         )
     )
 
@@ -228,5 +238,5 @@ if __name__ == '__main__':
     ray.init()
 
     prepare_taxi_data(
-        in_file="../data/train.csv", out_prefix="../data/train-trajectory2vec", seq_len=240, window_len=120
+        in_file="../data/train.csv", out_prefix="../data/train-trajectory2vec-v2", seq_len=300, window_len=150
     )
