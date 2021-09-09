@@ -39,12 +39,12 @@ def process_test(query_file, results_file, eval_model: BaselineTrajectory2VecExp
 if __name__ == '__main__':
     eval_model = load_eval_model(path="../../data/trajectory2vec.ckpt")
     process_test(
-        query_file="../../data/train-trajectory2vec.test.query.pkl",
-        results_file="../../data/train-trajectory2vec.test.query.results.pkl",
+        query_file="../../data/train-trajectory2vec-v2.test.query.pkl",
+        results_file="../../data/train-trajectory2vec-v2.test.query.results.pkl",
         eval_model=eval_model
     )
     process_test(
-        query_file="../../data/train-trajectory2vec.test.query_database.pkl",
-        results_file="../../data/train-trajectory2vec.test.query_database.results.pkl",
+        query_file="../../data/train-trajectory2vec-v2.test.query_database.pkl",
+        results_file="../../data/train-trajectory2vec-v2.test.query_database.results.pkl",
         eval_model=eval_model
     )

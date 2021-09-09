@@ -18,7 +18,7 @@ def subtrajectory_experiment(query_results_file: str, query_database_results_fil
 
     ranks = []
     for _, (query_id, query_vector) in enumerate(
-            tqdm(query_results, desc=f"searching query (m= {m}, dbsize={len(query_database_results)})")
+        tqdm(query_results, desc=f"searching query (m= {m}, dbsize={len(query_database_results)})")
     ):
         # query_database['DISTANCE'] = query_database["VECTOR"].transform(lambda vec: sqeuclidean(query_vector, vec))
         # sorted_database = query_database.sort_values(by=['DISTANCE'])
@@ -40,9 +40,9 @@ def subtrajectory_experiment(query_results_file: str, query_database_results_fil
 
 
 if __name__ == '__main__':
-    for dbsize in [20000, 40000, 60000, 80000, 100000]:
+    for dbsize in [0]:
         subtrajectory_experiment(
-            query_results_file="../../data/sample-trajectory2vec.test.query.results.pkl",
-            query_database_results_file="../../data/sample-trajectory2vec.test.query_database.results.pkl",
+            query_results_file="../../data/train-trajectory2vec-v2.test.query.results.pkl",
+            query_database_results_file="../../data/train-trajectory2vec-v2.test.query_database.results.pkl",
             m=dbsize
         )
