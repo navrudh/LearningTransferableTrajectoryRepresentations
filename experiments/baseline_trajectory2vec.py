@@ -12,13 +12,13 @@ from models.trajectory2vec import EncoderDecoder
 class BaselineTrajectory2VecExperiment(pl.LightningModule):
     def __init__(self):
         super().__init__()
-        self.model = EncoderDecoder(input_size=30, hidden_size=256, num_layers=3, dropout=0.2, bidirectional=False)
+        self.model = EncoderDecoder(input_size=36, hidden_size=256, num_layers=3, dropout=0.2, bidirectional=False)
 
     def forward(self, src, tgt, is_train: bool):
         return self.model.forward(src, tgt, is_train)
 
     def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
+        optimizer = torch.optim.Adam(self.parameters(), lr=1e-4)
         return optimizer
 
     def training_step(self, train_batch: Tuple[PackedSequence, PackedSequence, List[int]], batch_idx):
