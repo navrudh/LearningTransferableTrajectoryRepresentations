@@ -24,6 +24,20 @@ def distort_gps_array(trip: List[Tuple[float]], rate: float, radius=50.0):
     return noisetrip
 
 
+def distort(gps_meters: np.array, rate: float, radius=50.0):
+    noise_trajectory = np.copy(gps_meters)
+    N = gps_meters.shape[0]
+    noise = 2 * np.random.random_sample((N, 2)) - 1
+    normz = np.sqrt(np.square(noise[:, 0]) + np.square(noise[:, 1]))
+    noise = radius * (noise / normz[:, np.newaxis])
+    noise_prob = np.random.random_sample(N)
+    noise[noise_prob > rate, 0] = 0
+    noise[noise_prob > rate, 1] = 0
+    noise_trajectory[:, 0] += noise[:, 0]
+    noise_trajectory[:, 1] += noise[:, 1]
+    return noise_trajectory
+
+
 def lonlat2meters(lon: np.array, lat: np.array) -> Tuple[np.array, np.array]:
     semimajoraxis = 6378137.0
     east = lon * 0.017453292519943295
@@ -38,3 +52,9 @@ def meters2lonlat(x: np.array, y: np.array) -> Tuple[np.array, np.array]:
     t = np.exp(y / 3189068.5)
     lat = np.arcsin((t - 1) / (t + 1)) / 0.017453292519943295
     return lon, lat
+
+
+if __name__ == '__main__':
+    arr = np.array([np.arange(20) + 500., np.arange(20) + 400.]).T
+    print(distort(arr, rate=0.3))
+    print(arr)
