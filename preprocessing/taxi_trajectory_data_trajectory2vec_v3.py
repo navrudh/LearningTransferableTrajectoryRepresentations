@@ -294,5 +294,5 @@ if __name__ == '__main__':
     ray.init()
 
     prepare_taxi_data(
-        in_file="../data/train.csv", out_prefix="../data/train-trajectory2vec-v2", seq_len=300, window_len=150
+        in_file="../data/train.csv", out_prefix="../data/train-trajectory2vec-v3", seq_len=300, window_len=150
     )
