@@ -9,6 +9,7 @@ script version: v2
 import json
 import math
 import pickle
+import random
 from pathlib import Path
 from typing import List
 
@@ -61,7 +62,8 @@ def prepare_taxi_data(in_file: str, out_prefix: str, seq_len=600, window_len=300
     metadata = {}
 
     file_df['POLYLINE'] = file_df['POLYLINE'].transform(lambda s: json.loads(s))
-    file_df = file_df[file_df['POLYLINE'].map(len) >= 30]
+    file_df = file_df[file_df['POLYLINE'].map(len) >= 20]
+    file_df = file_df[file_df['POLYLINE'].map(len) <= 100]
     file_df['POLYLINE'] = file_df['POLYLINE'].transform(lambda gps_list: gps2meters(gps_list))
 
     # shuffle and split
@@ -232,6 +234,9 @@ def get_subtrajectories(df: pd.DataFrame):
 
 
 if __name__ == '__main__':
+    random.seed(49)
+    np.random.seed(49)
+
     import ray
 
     ray.shutdown()
