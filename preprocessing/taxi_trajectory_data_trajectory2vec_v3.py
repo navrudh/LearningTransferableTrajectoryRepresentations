@@ -37,8 +37,12 @@ DOWNSAMPLING_RATES = [.1, .15, .2, .25, .3]
 DATASET_SAMPLE_RATE = 15  # gps coordinated are sampled every 15 seconds
 
 
-def get_dataset_file(path):
-    return Path(f"{path}.dataframe.pkl")
+def get_dataset_file(path, suffix=None):
+    if suffix is not None:
+        filename = "-".join([path, suffix])
+    else:
+        filename = path
+    return Path(f"{filename}.dataframe.pkl")
 
 
 def get_metadata_file(path):
@@ -72,27 +76,36 @@ def prepare_taxi_data(in_file: str, out_prefix: str, seq_len=600, window_len=300
     train_df = file_df[:train_size]
     test_df = file_df[train_size:]
 
+    # create source data
     train_df['SOURCE'] = train_df['POLYLINE'].transform(lambda gps_meter_list: downsampling_distort(gps_meter_list))
+
+    # process target data
     train_df['POLYLINE'] = train_df['POLYLINE'].transform(
         lambda gps_meter_list: sliding_window(gps_meter_list, seq_len, window_len)
-    )
-    train_df = train_df.explode('SOURCE')
-    train_df['SOURCE'] = train_df['SOURCE'].apply(
-        lambda gps_meter_list: sliding_window_varying_samplerate(gps_meter_list, seq_len, window_len)
     )
     # normalization
     tr_min, tr_max = compute_min_max(train_df)
     tr_diff = tr_max - tr_min
     metadata["train_min"] = tr_min
     metadata["train_max"] = tr_max
-    pickle.dump(metadata, open(get_metadata_file(train_prefix), "wb"))
+
+    # process source data
+    train_df['SOURCE'] = train_df['SOURCE'].explode()
+    print("exploded 'source' dataset")
+    # source = source.rename_axis('target_idx').reset_index()
+    train_df['SOURCE'] = train_df['SOURCE'].apply(
+        lambda gps_meter_list: sliding_window_varying_samplerate(gps_meter_list, seq_len, window_len)
+    )
+
     print("normalizing target")
     train_df['POLYLINE'] = train_df['POLYLINE'].transform(lambda arr: (arr - tr_min) / tr_diff)
     print("normalizing source")
-    train_df['SOURCE'] = train_df['SOURCE'].transform(lambda arr: (arr - tr_min) / tr_diff)
+    train_df['SOURCE'] = train_df['SOURCE'].apply(lambda arr: (arr - tr_min) / tr_diff)
 
-    print("saving training data")
-    train_df.to_pickle(get_dataset_file(train_prefix))
+    print("saving train dataset")
+    pickle.dump(metadata, open(get_metadata_file(train_prefix), "wb"))
+    train_df.to_pickle(get_dataset_file(train_prefix), compression="gzip")
+    print("saved train dataset")
 
     # val
     print("build validation data")
@@ -268,8 +281,8 @@ def apply_downsampling(lst: List):
 
 def downsampling_distort(trip: np.ndarray):
     noise_trips = []
-    dropping_rates = [0, 0.2, 0.4, 0.5, 0.6]
-    distorting_rates = [0, 0.2, 0.4, 0.6]
+    dropping_rates = [0, 0.2, 0.4, 0.6]
+    distorting_rates = [0, 0.3, 0.6]
     for dropping_rate in dropping_rates:
         noisetrip1 = downsampling(trip, dropping_rate)
         for distorting_rate in distorting_rates:

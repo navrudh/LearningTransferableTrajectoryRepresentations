@@ -5,7 +5,9 @@ from pytorch_lightning.callbacks import EarlyStopping
 from pytorch_lightning.loggers import TensorBoardLogger
 from torch.utils.data import DataLoader
 
-from datasets.taxi_porto import collate_fn_porto, FrameEncodedPortoTaxiDataset
+from datasets.taxi_porto import collate_fn_porto_train, collate_fn_porto_val, \
+    FrameEncodedPortoTaxiTrainDataset, \
+    FrameEncodedPortoTaxiValDataset
 
 
 def run_experiment(
@@ -14,10 +16,12 @@ def run_experiment(
     if name is None:
         name = model.__class__.__name__
 
-    train_dataset = FrameEncodedPortoTaxiDataset('../data/train-trajectory2vec-v2.train.dataframe.pkl')
-    val_dataset = FrameEncodedPortoTaxiDataset('../data/train-trajectory2vec-v2.val.dataframe.pkl')
-    train_loader = DataLoader(train_dataset, batch_size=2048, collate_fn=collate_fn_porto, shuffle=True, num_workers=10)
-    val_loader = DataLoader(val_dataset, batch_size=2048, collate_fn=collate_fn_porto, num_workers=10)
+    train_dataset = FrameEncodedPortoTaxiTrainDataset('../data/train-trajectory2vec-v3.train.dataframe.pkl')
+    val_dataset = FrameEncodedPortoTaxiValDataset('../data/train-trajectory2vec-v3.val.dataframe.pkl')
+    train_loader = DataLoader(
+        train_dataset, batch_size=2048, num_workers=10, collate_fn=collate_fn_porto_train, shuffle=True
+    )
+    val_loader = DataLoader(val_dataset, batch_size=2048, num_workers=10, collate_fn=collate_fn_porto_val)
 
     # training
     trainer = pl.Trainer(

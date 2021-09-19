@@ -3,7 +3,7 @@ import pickle
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from datasets.taxi_porto import FrameEncodedPortoTaxiDataset
+from datasets.taxi_porto import FrameEncodedPortoTaxiValDataset
 from experiments.baseline_trajectory2vec import BaselineTrajectory2VecExperiment
 
 
@@ -23,7 +23,7 @@ def process_test(query_file, results_file, eval_model: BaselineTrajectory2VecExp
     :param eval_model: the model that processes queries to results
     :return: None
     """
-    dataset = FrameEncodedPortoTaxiDataset(query_file)
+    dataset = FrameEncodedPortoTaxiValDataset(query_file)
     loader = DataLoader(dataset)
 
     test_results = []
@@ -37,14 +37,14 @@ def process_test(query_file, results_file, eval_model: BaselineTrajectory2VecExp
 
 
 if __name__ == '__main__':
-    eval_model = load_eval_model(path="../../data/trajectory2vec.ckpt")
+    eval_model = load_eval_model(path="../../data/trajectory2vec-v3.ckpt")
     process_test(
-        query_file="../../data/train-trajectory2vec-v2.test.query.pkl",
-        results_file="../../data/train-trajectory2vec-v2.test.query.results.pkl",
+        query_file="../../data/train-trajectory2vec-v3.test.query.pkl",
+        results_file="../../data/train-trajectory2vec-v3.test.query.results.pkl",
         eval_model=eval_model
     )
     process_test(
-        query_file="../../data/train-trajectory2vec-v2.test.query_database.pkl",
-        results_file="../../data/train-trajectory2vec-v2.test.query_database.results.pkl",
+        query_file="../../data/train-trajectory2vec-v3.test.query_database.pkl",
+        results_file="../../data/train-trajectory2vec-v3.test.query_database.results.pkl",
         eval_model=eval_model
     )

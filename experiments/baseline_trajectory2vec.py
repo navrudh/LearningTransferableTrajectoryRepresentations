@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import Tuple
 
 import pytorch_lightning as pl
 import torch.optim
@@ -21,18 +21,18 @@ class BaselineTrajectory2VecExperiment(pl.LightningModule):
         optimizer = torch.optim.Adam(self.parameters(), lr=1e-4)
         return optimizer
 
-    def training_step(self, train_batch: Tuple[PackedSequence, PackedSequence, List[int]], batch_idx):
-        src, tgt, lengths = train_batch
+    def training_step(self, train_batch: Tuple[PackedSequence, PackedSequence], batch_idx):
+        src, tgt = train_batch
         x_hat = self.forward(src, tgt, is_train=True)
-        x = pad_packed_sequence(src)[0]
+        x = pad_packed_sequence(tgt)[0]
         loss = F.mse_loss(x, x_hat)
         self.log('train_loss', loss)
         return loss
 
-    def validation_step(self, val_batch, batch_idx):
-        src, tgt, lengths = val_batch
+    def validation_step(self, val_batch: Tuple[PackedSequence, PackedSequence], batch_idx):
+        src, tgt = val_batch
         x_hat = self.forward(src, tgt, is_train=True)
-        x = pad_packed_sequence(src)[0]
+        x = pad_packed_sequence(tgt)[0]
         loss = F.mse_loss(x, x_hat)
         self.log('val_loss', loss, prog_bar=True, on_epoch=True)
 
@@ -40,4 +40,4 @@ class BaselineTrajectory2VecExperiment(pl.LightningModule):
 if __name__ == '__main__':
     model = BaselineTrajectory2VecExperiment()
     trainer = run_experiment(model=model, gpus=[2])
-    trainer.save_checkpoint("../data/trajectory2vec.ckpt")
+    trainer.save_checkpoint("../data/trajectory2vec-v3.ckpt")
