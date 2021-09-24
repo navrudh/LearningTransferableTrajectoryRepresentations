@@ -14,7 +14,7 @@ def load_eval_model(path: str):
     return model
 
 
-def process_test(query_file, results_file, eval_model: BaselineTrajectory2VecExperiment):
+def process_queries(query_file, results_file, eval_model: BaselineTrajectory2VecExperiment):
     """
     Save the output of the last hidden layer
 
@@ -38,12 +38,12 @@ def process_test(query_file, results_file, eval_model: BaselineTrajectory2VecExp
 
 if __name__ == '__main__':
     eval_model = load_eval_model(path="../../data/trajectory2vec-v3.ckpt")
-    process_test(
+    process_queries(
         query_file="../../data/train-trajectory2vec-v3.test.query.pkl",
         results_file="../../data/train-trajectory2vec-v3.test.query.results.pkl",
         eval_model=eval_model
     )
-    process_test(
+    process_queries(
         query_file="../../data/train-trajectory2vec-v3.test.query_database.pkl",
         results_file="../../data/train-trajectory2vec-v3.test.query_database.results.pkl",
         eval_model=eval_model

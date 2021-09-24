@@ -9,10 +9,10 @@ def sqeuclidean(v1, v2):
     return np.dot(d, d)
 
 
-def subtrajectory_experiment(query_results_file: str, query_database_results_file: str, m: int = 0):
+def subtrajectory_experiment(query_results_file: str, db_results_file: str, m: int = 0):
     db_size = m + 10_000
     query_results = pickle.load(open(query_results_file, "rb"))
-    query_database_results = pickle.load(open(query_database_results_file, "rb"))
+    query_database_results = pickle.load(open(db_results_file, "rb"))
     query_database_results = query_database_results[:db_size]
     # query_database = pandas.DataFrame(query_database_results, columns=["TRAJECTORY_ID", "VECTOR"])
 
@@ -42,7 +42,7 @@ def subtrajectory_experiment(query_results_file: str, query_database_results_fil
 if __name__ == '__main__':
     for dbsize in [0]:
         subtrajectory_experiment(
-            query_results_file="../../data/train-trajectory2vec-v3.test.query.results.pkl",
-            query_database_results_file="../../data/train-trajectory2vec-v3.test.query_database.results.pkl",
+            query_results_file='../../data/t2vec/query.results.pkl',
+            db_results_file='../../data/t2vec/query_database.results.pkl',
             m=dbsize
         )
