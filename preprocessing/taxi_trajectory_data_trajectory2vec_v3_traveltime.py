@@ -17,7 +17,7 @@ import modin.pandas as pd
 import numpy as np
 
 from utils.array import downsampling
-from utils.gps import distort, distort_gps_array, downsample_gps_array, lonlat2meters
+from utils.gps import distort, lonlat2meters
 
 EPSILON = 1e-10
 FLOAT_MAX = np.iinfo(np.int64).max
@@ -33,7 +33,6 @@ panda_types = {
     'MISSING_DATA': bool,
     'POLYLINE': str,
 }
-DOWNSAMPLING_RATES = [.1, .15, .2, .25, .3]
 DATASET_SAMPLE_RATE = 15  # gps coordinated are sampled every 15 seconds
 
 
@@ -66,10 +65,10 @@ def prepare_taxi_data(in_file: str, out_prefix: str, seq_len=600, window_len=300
 
     metadata = {}
 
-    file_df['POLYLINE'] = file_df['POLYLINE'].transform(lambda s: json.loads(s))
+    file_df['POLYLINE'] = file_df['POLYLINE'].apply(lambda s: json.loads(s))
     file_df = file_df[file_df['POLYLINE'].map(len) >= 20]
     file_df = file_df[file_df['POLYLINE'].map(len) <= 100]
-    file_df['POLYLINE'] = file_df['POLYLINE'].transform(lambda gps_list: gps2meters(gps_list))
+    file_df['POLYLINE'] = file_df['POLYLINE'].apply(lambda gps_list: gps2meters(gps_list))
 
     # shuffle and split
     train_size = 800_000
@@ -77,10 +76,10 @@ def prepare_taxi_data(in_file: str, out_prefix: str, seq_len=600, window_len=300
     test_df = file_df[train_size:]
 
     # create source data
-    train_df['SOURCE'] = train_df['POLYLINE'].transform(lambda gps_meter_list: downsampling_distort(gps_meter_list))
+    train_df['SOURCE'] = train_df['POLYLINE'].apply(lambda gps_meter_list: downsampling_distort(gps_meter_list))
 
     # process target data
-    train_df['POLYLINE'] = train_df['POLYLINE'].transform(
+    train_df['POLYLINE'] = train_df['POLYLINE'].apply(
         lambda gps_meter_list: sliding_window(gps_meter_list, seq_len, window_len)
     )
     # normalization
@@ -98,7 +97,7 @@ def prepare_taxi_data(in_file: str, out_prefix: str, seq_len=600, window_len=300
     )
 
     print("normalizing target")
-    train_df['POLYLINE'] = train_df['POLYLINE'].transform(lambda arr: (arr - tr_min) / tr_diff)
+    train_df['POLYLINE'] = train_df['POLYLINE'].apply(lambda arr: (arr - tr_min) / tr_diff)
     print("normalizing source")
     train_df['SOURCE'] = train_df['SOURCE'].apply(lambda arr: (arr - tr_min) / tr_diff)
 
@@ -113,32 +112,31 @@ def prepare_taxi_data(in_file: str, out_prefix: str, seq_len=600, window_len=300
     test_df = test_df.loc[~test_df.index.isin(val_df.index)]
     # validation prepared exactly like training data
 
-    val_df['POLYLINE'] = build_behavior_matrix(val_df['POLYLINE'], seq_len, window_len, tr_min, tr_max, tr_diff)
-    val_df['POLYLINE'].to_pickle(get_dataset_file(val_prefix))
+    val_df['POLYLINE'] = build_behavior_matrix(
+        val_df['POLYLINE'], seq_len, window_len, tr_min, tr_max, tr_diff, window_fn=sliding_window
+    )
+    val_df['POLYLINE'].to_pickle(get_dataset_file(val_prefix), compression="gzip")
 
     # experiment queries
     print("build query set")
     # q - query trajectories
     # p - additional traj from the test set
-    qp = test_df.sample(n=100_000 + 10_000)
-    q = qp[:10_000]
-    p = qp[10_000:]
+    d = test_df.sample(n=10_000)
+    travel_durations = d['POLYLINE'].apply(lambda trip: len(trip) * 15)
+    travel_durations.to_pickle(get_dataset_file(test_prefix, suffix="duration"), compression="gzip")
 
-    q_a, q_b = get_subtrajectories(q)
-    p_a, p_b = get_subtrajectories(p)
-    query_db = pd.concat([q_b, p_a])  # p_b is ignored as we need only 100_000 traj
+    queries = build_behavior_matrix(
+        d['POLYLINE'], seq_len, window_len, tr_min, tr_max, tr_diff, window_fn=sliding_window
+    )
+    queries.to_pickle(get_database_file(test_prefix + "-ds-0.0"), compression="gzip")
 
-    q_a = build_behavior_matrix(q_a, seq_len, window_len, tr_min, tr_max, tr_diff)
-    q_a.to_pickle(get_query_file(test_prefix))
-
-    query_db = build_behavior_matrix(query_db, seq_len, window_len, tr_min, tr_max, tr_diff)
-    query_db.to_pickle(get_database_file(test_prefix))
-
-
-def build_behavior_matrix(df, seq_len, window_len, tr_min, tr_max, tr_diff):
-    df = df.transform(lambda gps_meter_list: sliding_window(gps_meter_list, seq_len, window_len))
-    df = df.transform(lambda arr: (arr - tr_min) / tr_diff)
-    return df
+    for rate in [0.2, 0.4, 0.6]:
+        print("downsampling rate : " + str(rate))
+        downsampled_d = d['POLYLINE'].apply(lambda trip: downsampling(trip, rate))
+        downsampled_queries = build_behavior_matrix(
+            downsampled_d, seq_len, window_len, tr_min, tr_max, tr_diff, window_fn=sliding_window_varying_samplerate
+        )
+        downsampled_queries.to_pickle(get_database_file(test_prefix + "-ds-" + str(rate)), compression="gzip")
 
 
 def gps2meters(polyline: List):
@@ -189,6 +187,12 @@ def sliding_window_varying_samplerate(arr: np.array, window_size_seconds: int, s
     return [element for element in windowed_results if element is not None]
 
 
+def build_behavior_matrix(df, seq_len, window_len, tr_min, tr_max, tr_diff, window_fn=sliding_window):
+    df = df.apply(lambda gps_meter_list: window_fn(gps_meter_list, seq_len, window_len))
+    df = df.apply(lambda arr: (arr - tr_min) / tr_diff)
+    return df
+
+
 def rolling_window(sample, windowsize, offset):
     timeLength = sample[len(sample) - 1][0]
     windowLength = int(timeLength / offset) + 1
@@ -236,6 +240,9 @@ def calc_feature_stat_matrix(x: np.ndarray):
     if x.shape[0] == 0:
         return None
 
+    # remove timesteps
+    x[:, 0] = 0.0
+
     return np.concatenate(
         (
             x.mean(axis=0),
@@ -256,8 +263,8 @@ def compute_mean_std(df: pd.DataFrame):
 
 
 def compute_min_max(df: pd.DataFrame):
-    _min = df['POLYLINE'].transform(lambda arr: np.min(arr, 0, initial=FLOAT_MAX)).to_list()
-    _max = df['POLYLINE'].transform(lambda arr: np.max(arr, 0, initial=FLOAT_MIN)).to_list()
+    _min = df['POLYLINE'].apply(lambda arr: np.min(arr, 0, initial=FLOAT_MAX)).to_list()
+    _max = df['POLYLINE'].apply(lambda arr: np.max(arr, 0, initial=FLOAT_MIN)).to_list()
 
     _min = np.min(_min, axis=0)
     _max = np.max(_max, axis=0)
@@ -266,17 +273,6 @@ def compute_min_max(df: pd.DataFrame):
 
 def normalize_local_metrics(df: pd.DataFrame):
     df['POLYLINE'] = df['POLYLINE'].transform(lambda arr: (arr - np.mean(arr, 0)) / np.std(arr, 0))
-
-
-def apply_gaussian_noise(lst: List):
-    trip = distort_gps_array(lst, .22, 50)
-    trip[0] = lst[0]
-    trip[-1] = lst[-1]
-    return trip
-
-
-def apply_downsampling(lst: List):
-    return downsample_gps_array(lst, rate=DOWNSAMPLING_RATES[np.random.randint(0, 4 + 1)])
 
 
 def downsampling_distort(trip: np.ndarray):
@@ -307,5 +303,8 @@ if __name__ == '__main__':
     ray.init()
 
     prepare_taxi_data(
-        in_file="../data/train.csv", out_prefix="../data/train-trajectory2vec-v3", seq_len=300, window_len=150
+        in_file="../data/train.csv",
+        out_prefix="../data/train-trajectory2vec-v3-no-timesteps",
+        seq_len=300,
+        window_len=150
     )
