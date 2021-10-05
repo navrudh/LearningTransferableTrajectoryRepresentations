@@ -5,11 +5,10 @@
     "num_layers": 3,
     "dropout": 0.2
   },
-
   "trainer_kwargs": {
-    "gpus": [1],
-    "deterministic": true,
-  },
-
-  "experiments": ["trajectory-similarity", "trajectory-clustering","travel-time-prediction"]
+    "gpus": [
+      1
+    ],
+    "deterministic": true
+  }
 }
