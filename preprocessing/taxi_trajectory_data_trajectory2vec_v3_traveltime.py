@@ -226,7 +226,6 @@ def calc_car_movement_features(arr: np.array):
 
     return np.column_stack(
         (
-            timesteps,
             np.pad(velocity_norm, (seq_len - velocity_norm.shape[0], 0), 'constant'),
             np.pad(diff_velocity_norm, (seq_len - diff_velocity_norm.shape[0], 0), 'constant'),
             np.pad(acceleration_norm, (seq_len - acceleration_norm.shape[0], 0), 'constant'),
@@ -239,9 +238,6 @@ def calc_car_movement_features(arr: np.array):
 def calc_feature_stat_matrix(x: np.ndarray):
     if x.shape[0] == 0:
         return None
-
-    # remove timesteps
-    x[:, 0] = 0.0
 
     return np.concatenate(
         (

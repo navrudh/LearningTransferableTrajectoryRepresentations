@@ -9,7 +9,7 @@ from torch.utils.data import Dataset
 
 class FrameEncodedPortoTaxiValDataset(Dataset):
     def __init__(self, pickle_file):
-        self.porto_df = pd.read_pickle(os.path.realpath(pickle_file))
+        self.porto_df = pd.read_pickle(os.path.realpath(pickle_file), compression="gzip")
 
     def __len__(self):
         return len(self.porto_df)

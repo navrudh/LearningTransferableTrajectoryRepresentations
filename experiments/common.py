@@ -11,13 +11,14 @@ from datasets.taxi_porto import collate_fn_porto_train, collate_fn_porto_val, \
 
 
 def run_experiment(
-    model: pl.LightningModule, gpus: Optional[Union[List[int], str, int]] = 1, name: Union[str, None] = None
+    model: pl.LightningModule,
+    gpus: Optional[Union[List[int], str, int]] = 1,
+    path_prefix='../data/train-trajectory2vec-v3'
 ):
-    if name is None:
-        name = model.__class__.__name__
+    name = model.__class__.__name__
 
-    train_dataset = FrameEncodedPortoTaxiTrainDataset('../data/train-trajectory2vec-v3.train.dataframe.pkl')
-    val_dataset = FrameEncodedPortoTaxiValDataset('../data/train-trajectory2vec-v3.val.dataframe.pkl')
+    train_dataset = FrameEncodedPortoTaxiTrainDataset(f'{path_prefix}.train.dataframe.pkl')
+    val_dataset = FrameEncodedPortoTaxiValDataset(f'{path_prefix}.val.dataframe.pkl')
     train_loader = DataLoader(
         train_dataset, batch_size=2048, num_workers=10, collate_fn=collate_fn_porto_train, shuffle=True
     )
@@ -26,7 +27,7 @@ def run_experiment(
     # training
     trainer = pl.Trainer(
         gpus=gpus,
-        max_epochs=2000,
+        max_epochs=600,
         logger=TensorBoardLogger(save_dir="../logs", name=name),
         callbacks=[EarlyStopping(monitor="val_loss", patience=50)]
     )
