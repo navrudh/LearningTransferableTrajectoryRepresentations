@@ -10,50 +10,17 @@ import json
 import math
 import pickle
 import random
-from pathlib import Path
 from typing import List
 
 import modin.pandas as pd
 import numpy as np
 
+from preprocessing.taxi_trajectory_data_trajectory2vec_v3 import DATASET_SAMPLE_RATE, EPSILON, FLOAT_MAX, \
+    FLOAT_MIN, get_database_file, \
+    get_dataset_file, get_metadata_file, \
+    panda_types
 from utils.array import downsampling
 from utils.gps import distort, lonlat2meters
-
-EPSILON = 1e-10
-FLOAT_MAX = np.iinfo(np.int64).max
-FLOAT_MIN = np.iinfo(np.int64).min
-panda_types = {
-    'TRIP_ID': np.uint64,
-    'CALL_TYPE': str,
-    'ORIGIN_CALL': str,
-    'ORIGIN_STAND': str,
-    'TAXI_ID': np.uint64,
-    'TIMESTAMP': np.uint64,
-    'DAY_TYPE': str,
-    'MISSING_DATA': bool,
-    'POLYLINE': str,
-}
-DATASET_SAMPLE_RATE = 15  # gps coordinated are sampled every 15 seconds
-
-
-def get_dataset_file(path, suffix=None):
-    if suffix is not None:
-        filename = "-".join([path, suffix])
-    else:
-        filename = path
-    return Path(f"{filename}.dataframe.pkl")
-
-
-def get_metadata_file(path):
-    return Path(f"{path}.metadata.pkl")
-
-
-def get_database_file(path):
-    return Path(f"{path}.query_database.pkl")
-
-
-def get_query_file(path):
-    return Path(f"{path}.query.pkl")
 
 
 def prepare_taxi_data(in_file: str, out_prefix: str, seq_len=600, window_len=300):
@@ -124,6 +91,8 @@ def prepare_taxi_data(in_file: str, out_prefix: str, seq_len=600, window_len=300
     d = test_df.sample(n=10_000)
     travel_durations = d['POLYLINE'].apply(lambda trip: len(trip) * 15)
     travel_durations.to_pickle(get_dataset_file(test_prefix, suffix="duration"), compression="gzip")
+
+    d['POLYLINE'].to_pickle(get_dataset_file(test_prefix, suffix="traj"), compression="gzip")
 
     queries = build_behavior_matrix(
         d['POLYLINE'], seq_len, window_len, tr_min, tr_max, tr_diff, window_fn=sliding_window

@@ -42,19 +42,27 @@ def get_dataset_file(path, suffix=None):
         filename = "-".join([path, suffix])
     else:
         filename = path
-    return Path(f"{filename}.dataframe.pkl")
+    path = Path(f"{filename}.dataframe.pkl")
+    print(f"Dataset File: {path}")
+    return path
 
 
 def get_metadata_file(path):
-    return Path(f"{path}.metadata.pkl")
+    path = Path(f"{path}.metadata.pkl")
+    print(f"Metadata File: {path}")
+    return path
 
 
 def get_database_file(path):
-    return Path(f"{path}.query_database.pkl")
+    path = Path(f"{path}.query_database.pkl")
+    print(f"Database File: {path}")
+    return path
 
 
 def get_query_file(path):
-    return Path(f"{path}.query.pkl")
+    path = Path(f"{path}.query.pkl")
+    print(f"Query File: {path}")
+    return path
 
 
 def prepare_taxi_data(in_file: str, out_prefix: str, seq_len=600, window_len=300):

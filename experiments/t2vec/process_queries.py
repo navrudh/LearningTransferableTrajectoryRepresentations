@@ -8,7 +8,7 @@ def process_queries(query_db_pyh5_file: str, query_results_file: str, db_results
     num_query = 1000
     num_db = 100_000
 
-    t2vec_exp1_trj = h5py.File('../../data/t2vec/exp1-trj.h5')
+    t2vec_exp1_trj = h5py.File(query_db_pyh5_file)
     vecs = np.array(t2vec_exp1_trj['layer3'])
     query, db = vecs[:num_query], vecs[num_query:]
     query = [[idx, vec] for idx, vec in enumerate(query)]

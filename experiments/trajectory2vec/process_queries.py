@@ -7,8 +7,8 @@ from datasets.taxi_porto import FrameEncodedPortoTaxiValDataset
 from experiments.baseline_trajectory2vec import BaselineTrajectory2VecExperiment
 
 
-def load_eval_model(path: str):
-    model = BaselineTrajectory2VecExperiment.load_from_checkpoint(path)
+def load_eval_model(path: str, **kwargs):
+    model = BaselineTrajectory2VecExperiment.load_from_checkpoint(path, **kwargs)
     model.double()
     model.eval()
     return model
@@ -37,7 +37,7 @@ def process_queries(query_file, results_file, eval_model: BaselineTrajectory2Vec
 
 
 if __name__ == '__main__':
-    eval_model = load_eval_model(path="../../data/trajectory2vec-v3.ckpt")
+    eval_model = load_eval_model(path="../../data/trajectory2vec-v3.ckpt", input_size=36)
     process_queries(
         query_file="../../data/train-trajectory2vec-v3.test.query.pkl",
         results_file="../../data/train-trajectory2vec-v3.test.query.results.pkl",

@@ -10,9 +10,11 @@ from models.trajectory2vec import EncoderDecoder
 
 
 class BaselineTrajectory2VecExperiment(pl.LightningModule):
-    def __init__(self):
+    def __init__(self, input_size: int):
         super().__init__()
-        self.model = EncoderDecoder(input_size=30, hidden_size=256, num_layers=3, dropout=0.2, bidirectional=False)
+        self.model = EncoderDecoder(
+            input_size=input_size, hidden_size=256, num_layers=3, dropout=0.2, bidirectional=False
+        )
 
     def forward(self, src, tgt, is_train: bool):
         return self.model.forward(src, tgt, is_train)
@@ -38,6 +40,6 @@ class BaselineTrajectory2VecExperiment(pl.LightningModule):
 
 
 if __name__ == '__main__':
-    model = BaselineTrajectory2VecExperiment()
-    trainer = run_experiment(model=model, gpus=[1], path_prefix='../data/train-trajectory2vec-v3-no-timesteps')
-    trainer.save_checkpoint("../data/trajectory2vec-traveltime.ckpt")
+    model = BaselineTrajectory2VecExperiment(input_size=36)
+    trainer = run_experiment(model=model, gpus=[1], path_prefix='../data/train-trajectory2vec-v3')
+    trainer.save_checkpoint("../data/trajectory2vec-v3.ckpt")
