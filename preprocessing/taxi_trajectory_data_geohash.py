@@ -9,7 +9,8 @@ script version: v1
 import csv
 import json
 import random
-from typing import List, Tuple
+from pathlib import Path
+from typing import List, Tuple, Union
 
 import geohash2
 import modin.pandas as pd
@@ -19,6 +20,21 @@ from preprocessing.taxi_trajectory_data_trajectory2vec_v3 import get_database_fi
     get_dataset_file, get_query_file, panda_types
 from utils.array import downsampling
 from utils.gps import distort, lonlat2meters, meters2lonlat
+
+
+def save_csv(series: pd.Series, outfile: Union[str, Path]):
+    series.to_csv(
+        str(outfile) + ".csv.gz",
+        compression="gzip",
+        sep=' ',
+        index=False,
+        header=False,
+        quotechar="",
+        quoting=csv.QUOTE_NONE,
+        escapechar=" "
+    )
+
+    print("Saved: " + str(outfile) + ".csv.gz")
 
 
 def prepare_taxi_data(in_file: str, out_prefix: str):
@@ -38,45 +54,33 @@ def prepare_taxi_data(in_file: str, out_prefix: str):
     train_df = file_df[:train_size]
     test_df = file_df[train_size:]
 
+    print("Processing Train")
+
     # create source data
     distorted = train_df['POLYLINE'].apply(lambda gps_meter_list: downsampling_distort(gps_meter_list))
     distorted = distorted.explode()
     distorted = distorted.apply(lambda trajectory: meters2gps(trajectory))
     distorted = distorted.apply(lambda gps_trajectory: geohashify(gps_trajectory))
 
-    print("saving train dataset")
     distorted = distorted.apply(lambda geohash_list: " ".join(geohash_list))
-    distorted.to_csv(
-        str(get_dataset_file(train_prefix)) + ".csv.gz",
-        compression="gzip",
-        sep=' ',
-        index=False,
-        header=False, quotechar="",
-        quoting=csv.QUOTE_NONE, escapechar=" "
-    )
-    print("saved train dataset")
+    save_csv(distorted, get_dataset_file(train_prefix))
 
+    print("Processing Test")
     test_series = test_df['POLYLINE'].apply(lambda trajectory: meters2gps(trajectory))
     test_series = test_series.apply(lambda gps_trajectory: geohashify(gps_trajectory))
 
     # val
-    print("build validation data")
+    print("Generate: Validation")
     val_series = test_series.sample(n=10_000)
     test_series = test_series.loc[~test_series.index.isin(val_series.index)]
     # validation prepared exactly like training data
 
     val_series = val_series.apply(lambda geohash_list: " ".join(geohash_list))
-    val_series.to_csv(
-        str(get_dataset_file(val_prefix)) + ".csv.gz",
-        compression="gzip",
-        sep=' ',
-        index=False,
-        header=False, quotechar="",
-        quoting=csv.QUOTE_NONE, escapechar=" "
-    )
+    save_csv(val_series, get_dataset_file(val_prefix))
 
     # experiment queries
-    print("build query set")
+
+    print("Experiment: TRAJECTORY SIMILARITY")
     # q - query trajectories
     # p - additional traj from the test set
     qp = test_series.sample(n=100_000 + 10_000)
@@ -88,24 +92,32 @@ def prepare_taxi_data(in_file: str, out_prefix: str):
     query_db = pd.concat([q_b, p_a])  # p_b is ignored as we need only 100_000 traj
 
     q_a = q_a.apply(lambda geohash_list: " ".join(geohash_list))
-    q_a.to_csv(
-        str(get_query_file(test_prefix)) + ".csv.gz",
-        compression="gzip",
-        sep=' ',
-        index=False,
-        header=False, quotechar="",
-        quoting=csv.QUOTE_NONE, escapechar=" "
-    )
+    save_csv(q_a, get_query_file(test_prefix))
 
     query_db = query_db.apply(lambda geohash_list: " ".join(geohash_list))
-    query_db.to_csv(
-        str(get_database_file(test_prefix)) + ".csv.gz",
-        compression="gzip",
-        sep=' ',
-        index=False,
-        header=False, quotechar="",
-        quoting=csv.QUOTE_NONE, escapechar=" "
-    )
+    save_csv(query_db, get_database_file(test_prefix))
+
+    print("Experiment: DESTINATION PREDICTION")
+    destination_task_data = test_series.sample(n=10_000)
+    destinations = destination_task_data.apply(lambda trip: geohash2.decode_exactly(trip[-1]))
+    destinations.to_pickle(get_dataset_file(test_prefix, suffix="destinations"), compression="gzip")
+
+    destination_task_trajectories = destination_task_data.apply(lambda trip: trip[:int(len(trip) * 0.8)])
+    destination_task_trajectories = destination_task_trajectories.apply(lambda geohash_list: " ".join(geohash_list))
+    save_csv(destination_task_trajectories, get_query_file(test_prefix + "-dest-traj"))
+
+    print("Experiment: TRAVEL-TIME ESTIMATION")
+    traveltime_task_data = test_series.sample(n=10_000)
+    travel_durations = traveltime_task_data.apply(lambda trip: len(trip) * 15)
+    travel_durations.to_pickle(get_dataset_file(test_prefix, suffix="duration"), compression="gzip")
+
+    traveltime_trajectories_raw = traveltime_task_data.apply(lambda geohash_list: " ".join(geohash_list))
+    save_csv(traveltime_trajectories_raw, get_database_file(test_prefix + "-ds-0.0"))
+    for rate in [0.2, 0.4, 0.6]:
+        print("downsampling rate : " + str(rate))
+        downsampled_trajectories = traveltime_task_data.apply(lambda trip: downsampling(np.array(trip), rate).tolist())
+        downsampled_trajectories = downsampled_trajectories.apply(lambda geohash_list: " ".join(geohash_list))
+        save_csv(downsampled_trajectories, get_database_file(test_prefix + "-ds-" + str(rate)))
 
 
 def gps2meters(polyline: List):
