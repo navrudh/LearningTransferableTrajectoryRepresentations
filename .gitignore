@@ -28,6 +28,7 @@ ENV/
 
 # IPython Notebook
 .ipynb_checkpoints
+checkpoints
 
 # IntelliJ
 .idea
