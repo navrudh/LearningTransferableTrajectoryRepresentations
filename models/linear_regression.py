@@ -26,6 +26,9 @@ class LinearRegression(pl.LightningModule):
         bias: bool = True,
         learning_rate: float = 1e-3,
         optimizer: Type[Optimizer] = Adam,
+        scheduler=None,
+        scheduler_kwargs=None,
+        scheduler_config=None,
         l1_strength: float = 0.0,
         l2_strength: float = 0.0,
     ) -> None:
@@ -40,8 +43,17 @@ class LinearRegression(pl.LightningModule):
             l2_strength: L2 regularization strength (default: ``0.0``)
         """
         super().__init__()
+        if scheduler_kwargs is None:
+            scheduler_kwargs = {}
         self.save_hyperparameters()
         self.optimizer = optimizer
+        self.scheduler = scheduler
+
+        if self.scheduler:
+            assert scheduler_kwargs is not None, 'parameter scheduler_kwargs should not be None'
+            assert scheduler_config is not None, 'parameter scheduler_config should not be None'
+            self.scheduler_kwargs = scheduler_kwargs
+            self.scheduler_config = scheduler_config
 
         self.linear = nn.Linear(in_features=self.hparams.input_dim, out_features=self.hparams.output_dim, bias=bias)
 
@@ -82,5 +94,10 @@ class LinearRegression(pl.LightningModule):
         print(progress_bar_metrics)
         return {"test_loss": test_loss, "log": tensorboard_logs, "progress_bar": progress_bar_metrics}
 
-    def configure_optimizers(self) -> Optimizer:
-        return self.optimizer(self.parameters(), lr=self.hparams.learning_rate)
+    def configure_optimizers(self):
+        if self.scheduler is not None:
+            optim = self.optimizer(self.parameters(), lr=self.hparams.learning_rate)
+            sched = {'scheduler': self.scheduler(optim, **self.scheduler_kwargs), **self.scheduler_config}
+            return [optim], [sched]
+        else:
+            return self.optimizer(self.parameters(), lr=self.hparams.learning_rate)
