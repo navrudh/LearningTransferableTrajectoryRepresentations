@@ -5,7 +5,7 @@ import torch.optim
 from torch.nn import functional as F
 from torch.nn.utils.rnn import PackedSequence, pad_packed_sequence
 
-from experiments.common import run_experiment
+from common import run_experiment
 from models.trajectory2vec import EncoderDecoder
 
 

@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from accelerate import Accelerator
 from torch.utils.data import DataLoader
 
-from datasets.trembr.porto_embedding import PortoIterableDataset
+from datasets_impl.trembr.porto_embedding import PortoIterableDataset
 
 
 class Traj2VecModeler(nn.Module):

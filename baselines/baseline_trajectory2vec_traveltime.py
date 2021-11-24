@@ -1,5 +1,5 @@
-from experiments.baseline_trajectory2vec import BaselineTrajectory2VecExperiment
-from experiments.common import run_experiment
+from baseline_trajectory2vec import BaselineTrajectory2VecExperiment
+from common import run_experiment
 
 if __name__ == '__main__':
     model = BaselineTrajectory2VecExperiment(input_size=30)

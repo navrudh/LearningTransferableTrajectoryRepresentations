@@ -5,7 +5,7 @@ from pytorch_lightning.callbacks import EarlyStopping
 from pytorch_lightning.loggers import TensorBoardLogger
 from torch.utils.data import DataLoader
 
-from datasets_impl.taxi_porto import collate_fn_porto_train, collate_fn_porto_val, \
+from datasets_impl.taxi_porto import collate_fn_porto, \
     FrameEncodedPortoTaxiTrainDataset, \
     FrameEncodedPortoTaxiValDataset
 
@@ -23,10 +23,8 @@ def run_experiment(
 
     train_dataset = FrameEncodedPortoTaxiTrainDataset(f'{out_prefix}.train.dataframe.pkl')
     val_dataset = FrameEncodedPortoTaxiValDataset(f'{out_prefix}.val.dataframe.pkl')
-    train_loader = DataLoader(
-        train_dataset, batch_size=512, num_workers=10, collate_fn=collate_fn_porto_train, shuffle=True
-    )
-    val_loader = DataLoader(val_dataset, batch_size=512, num_workers=10, collate_fn=collate_fn_porto_val)
+    train_loader = DataLoader(train_dataset, batch_size=512, num_workers=10, collate_fn=collate_fn_porto, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=512, num_workers=10, collate_fn=collate_fn_porto)
 
     # training
     trainer = pl.Trainer(

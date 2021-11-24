@@ -5,8 +5,8 @@ if __name__ == '__main__':
 
     tokenizer.train(
         files=[
-            "../data/train-transformer.train.dataframe.pkl.csv", "../data/train-transformer.val.dataframe.pkl.csv",
-            "../data/train-transformer.test.query.pkl.csv", "../data/train-transformer.test.query_database.pkl.csv"
+            "../data/simulated/train.train.dataframe.pkl.csv",
+            "../data/simulated/test.train.dataframe.pkl.csv",
         ],
         vocab_size=52_000,
         min_frequency=2,
@@ -19,4 +19,4 @@ if __name__ == '__main__':
         ]
     )
 
-    tokenizer.save("../data/tokenizer-geohash-bbpe.json")
+    tokenizer.save("../data/simulated/tokenizer-geohash-bbpe.json")
