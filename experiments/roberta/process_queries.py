@@ -71,13 +71,13 @@ if __name__ == '__main__':
 
     process_queries(
         query_file="../../data/train-transformer.test.query.pkl.csv",
-        results_file="../../data/train-transformer.test.query.results.pkl",
-        eval_model=AutoModel.from_pretrained('../../data/models/roberta/geohashcode-model'),
+        results_file="../../data/train-transformer-h4.test.query.results.pkl",
+        eval_model=AutoModel.from_pretrained('../../data/models/roberta/attention-head-4'),
         tokenizer=tokenizer,
     )
     process_queries(
         query_file="../../data/train-transformer.test.query_database.pkl.csv",
-        results_file="../../data/train-transformer.test.query_database.results.pkl",
-        eval_model=AutoModel.from_pretrained('../../data/models/roberta/geohashcode-model'),
+        results_file="../../data/train-transformer-h4.test.query_database.results.pkl",
+        eval_model=AutoModel.from_pretrained('../../data/models/roberta/attention-head-4'),
         tokenizer=tokenizer,
     )

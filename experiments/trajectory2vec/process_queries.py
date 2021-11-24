@@ -3,7 +3,7 @@ import pickle
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from datasets.taxi_porto import FrameEncodedPortoTaxiValDataset
+from datasets_impl.taxi_porto import FrameEncodedPortoTaxiValDataset
 from experiments.baseline_trajectory2vec import BaselineTrajectory2VecExperiment
 
 

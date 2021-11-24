@@ -9,7 +9,10 @@ def sqeuclidean(v1, v2):
     return np.dot(d, d)
 
 
-def subtrajectory_experiment(query_results_file: str, db_results_file: str, m: int = 0):
+def run_trajectory_similarity_experiment(query_results_file: str, db_results_file: str, m: int = 0):
+    print("Query: " + query_results_file)
+    print("DB:    " + db_results_file)
+
     db_size = m + 10_000
     query_results = pickle.load(open(query_results_file, "rb"))
     query_database_results = pickle.load(open(db_results_file, "rb"))
@@ -37,12 +40,3 @@ def subtrajectory_experiment(query_results_file: str, db_results_file: str, m: i
     print("Database Len:", len(query_database_results))
     print("M:", m)
     print("Mean Rank:", mean_rank)
-
-
-if __name__ == '__main__':
-    for dbsize in [0]:
-        subtrajectory_experiment(
-            query_results_file='../../data/t2vec/query.results.pkl',
-            db_results_file='../../data/t2vec/query_database.results.pkl',
-            m=dbsize
-        )
