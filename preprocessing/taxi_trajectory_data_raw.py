@@ -8,12 +8,23 @@ script version: v3
 
 import json
 import random
+from pathlib import Path
+from typing import Union
 
 import modin.pandas as pd
 import numpy as np
 
 from preprocessing.taxi_trajectory_data_geohash import downsampling, downsampling_distort, get_database_file, \
-    get_dataset_file, get_query_file, get_subtrajectories, gps2meters, meters2gps, panda_types, save_csv
+    get_dataset_file, get_query_file, get_subtrajectories, gps2meters, meters2gps, panda_types
+
+
+def save_pickle(series: pd.Series, outfile: Union[str, Path]):
+    series.to_pickle(
+        str(outfile),
+        compression="gzip",
+    )
+
+    print("Saved: " + str(outfile))
 
 
 def prepare_taxi_data(in_file: str, out_prefix: str):
@@ -36,10 +47,11 @@ def prepare_taxi_data(in_file: str, out_prefix: str):
     print("Processing Train")
 
     # create source data
-    distorted = train_df['POLYLINE'].apply(lambda gps_meter_list: downsampling_distort(gps_meter_list))
-    distorted = distorted.explode()
-    distorted = distorted.apply(lambda trajectory: meters2gps(trajectory))
-    save_csv(distorted, get_dataset_file(train_prefix))
+    train_df['SOURCE'] = train_df['POLYLINE'].apply(lambda gps_meter_list: downsampling_distort(gps_meter_list))
+    train_df['POLYLINE'] = train_df['POLYLINE'].apply(lambda trajectory: meters2gps(trajectory))
+    train_df['SOURCE'] = train_df['SOURCE'].explode()
+    train_df['SOURCE'] = train_df['SOURCE'].apply(lambda trajectory: meters2gps(trajectory))
+    save_pickle(train_df, get_dataset_file(train_prefix))
 
     print("Processing Test")
     test_series = test_df['POLYLINE'].apply(lambda trajectory: meters2gps(trajectory))
@@ -50,43 +62,45 @@ def prepare_taxi_data(in_file: str, out_prefix: str):
     test_series = test_series.loc[~test_series.index.isin(val_series.index)]
     # validation prepared exactly like training data
 
-    save_csv(val_series, get_dataset_file(val_prefix))
+    save_pickle(val_series, get_dataset_file(val_prefix))
 
     # experiment queries
 
     print("Experiment: TRAJECTORY SIMILARITY")
     # q - query trajectories
     # p - additional traj from the test set
-    qp = test_series.sample(n=100_000 + 10_000)
-    q = qp[:10_000]
-    p = qp[10_000:]
+    min_query_db_size = 100_000
+    max_query_db_size = 10_000
+    qp = test_series.sample(n=max_query_db_size + min_query_db_size)
+    q = qp[:min_query_db_size]
+    p = qp[min_query_db_size:]
 
     q_a, q_b = get_subtrajectories(q)
     p_a, p_b = get_subtrajectories(p)
     query_db = pd.concat([q_b, p_a])  # p_b is ignored as we need only 100_000 traj
 
-    save_csv(q_a, get_query_file(test_prefix))
+    save_pickle(q_a, get_query_file(test_prefix))
 
-    save_csv(query_db, get_database_file(test_prefix))
+    save_pickle(query_db, get_database_file(test_prefix))
 
     print("Experiment: DESTINATION PREDICTION")
-    destination_task_data = test_series.sample(n=10_000)
+    destination_task_data = test_series.sample(n=min_query_db_size)
     destinations = destination_task_data.apply(lambda trip: trip[-1])
     destinations.to_pickle(get_dataset_file(test_prefix, suffix="destinations"), compression="gzip")
 
     destination_task_trajectories = destination_task_data.apply(lambda trip: trip[:int(len(trip) * 0.8)])
-    save_csv(destination_task_trajectories, get_query_file(test_prefix + "-dest-traj"))
+    save_pickle(destination_task_trajectories, get_query_file(test_prefix + "-dest-traj"))
 
     print("Experiment: TRAVEL-TIME ESTIMATION")
-    traveltime_task_data = test_series.sample(n=10_000)
+    traveltime_task_data = test_series.sample(n=min_query_db_size)
     travel_durations = traveltime_task_data.apply(lambda trip: len(trip) * 15)
     travel_durations.to_pickle(get_dataset_file(test_prefix, suffix="duration"), compression="gzip")
 
-    save_csv(traveltime_task_data, get_database_file(test_prefix + "-ds-0.0"))
+    save_pickle(traveltime_task_data, get_database_file(test_prefix + "-ds-0.0"))
     for rate in [0.2, 0.4, 0.6]:
         print("downsampling rate : " + str(rate))
         downsampled_trajectories = traveltime_task_data.apply(lambda trip: downsampling(np.array(trip), rate).tolist())
-        save_csv(downsampled_trajectories, get_database_file(test_prefix + "-ds-" + str(rate)))
+        save_pickle(downsampled_trajectories, get_database_file(test_prefix + "-ds-" + str(rate)))
 
 
 if __name__ == '__main__':
@@ -99,6 +113,6 @@ if __name__ == '__main__':
     ray.init()
 
     prepare_taxi_data(
-        in_file="../data/train.csv",
+        in_file="../data/sample.csv",
         out_prefix="../data/raw-gps-trajectories",
     )
