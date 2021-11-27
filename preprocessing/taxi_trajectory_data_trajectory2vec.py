@@ -8,61 +8,16 @@ script version: v3
 
 import json
 import math
-import pickle
 import random
-from pathlib import Path
 from typing import List
 
 import modin.pandas as pd
 import numpy as np
 
+from preprocessing.common import DATASET_SAMPLE_RATE, downsampling_distort, EPSILON, FLOAT_MAX, FLOAT_MIN, \
+    get_database_file, get_dataset_file, get_query_file, get_subtrajectories, panda_types, save_pickle
 from utils.array import downsampling
-from utils.gps import distort, distort_gps_array, downsample_gps_array, lonlat2meters
-
-EPSILON = 1e-10
-FLOAT_MAX = np.iinfo(np.int64).max
-FLOAT_MIN = np.iinfo(np.int64).min
-panda_types = {
-    'TRIP_ID': np.uint64,
-    'CALL_TYPE': str,
-    'ORIGIN_CALL': str,
-    'ORIGIN_STAND': str,
-    'TAXI_ID': np.uint64,
-    'TIMESTAMP': np.uint64,
-    'DAY_TYPE': str,
-    'MISSING_DATA': bool,
-    'POLYLINE': str,
-}
-DOWNSAMPLING_RATES = [.1, .15, .2, .25, .3]
-DATASET_SAMPLE_RATE = 15  # gps coordinated are sampled every 15 seconds
-
-
-def get_dataset_file(path, suffix=None):
-    if suffix is not None:
-        filename = "-".join([path, suffix])
-    else:
-        filename = path
-    path = Path(f"{filename}.dataframe.pkl")
-    print(f"Dataset File: {path}")
-    return path
-
-
-def get_metadata_file(path):
-    path = Path(f"{path}.metadata.pkl")
-    print(f"Metadata File: {path}")
-    return path
-
-
-def get_database_file(path):
-    path = Path(f"{path}.query_database.pkl")
-    print(f"Database File: {path}")
-    return path
-
-
-def get_query_file(path):
-    path = Path(f"{path}.query.pkl")
-    print(f"Query File: {path}")
-    return path
+from utils.gps import lonlat2meters
 
 
 def prepare_taxi_data(in_file: str, out_prefix: str, seq_len=600, window_len=300):
@@ -72,17 +27,21 @@ def prepare_taxi_data(in_file: str, out_prefix: str, seq_len=600, window_len=300
 
     file_df = pd.read_csv(in_file, dtype=panda_types, usecols=['POLYLINE'])
 
-    metadata = {}
-
-    file_df['POLYLINE'] = file_df['POLYLINE'].transform(lambda s: json.loads(s))
+    file_df['POLYLINE'] = file_df['POLYLINE'].apply(lambda s: json.loads(s))
     file_df = file_df[file_df['POLYLINE'].map(len) >= 20]
     file_df = file_df[file_df['POLYLINE'].map(len) <= 100]
-    file_df['POLYLINE'] = file_df['POLYLINE'].transform(lambda gps_list: gps2meters(gps_list))
+    file_df['POLYLINE'] = file_df['POLYLINE'].apply(lambda gps_list: gps2meters(gps_list))
+
+    print("Cleaning Dataset")
 
     # shuffle and split
     train_size = 800_000
+    test_size = 10_000
+    val_size = 10_000
     train_df = file_df[:train_size]
     test_df = file_df[train_size:]
+
+    print("Processing Train")
 
     # create source data
     train_df['SOURCE'] = train_df['POLYLINE'].transform(lambda gps_meter_list: downsampling_distort(gps_meter_list))
@@ -94,59 +53,88 @@ def prepare_taxi_data(in_file: str, out_prefix: str, seq_len=600, window_len=300
     # normalization
     tr_min, tr_max = compute_min_max(train_df)
     tr_diff = tr_max - tr_min
-    metadata["train_min"] = tr_min
-    metadata["train_max"] = tr_max
 
     # process source data
     train_df['SOURCE'] = train_df['SOURCE'].explode()
-    print("exploded 'source' dataset")
     # source = source.rename_axis('target_idx').reset_index()
     train_df['SOURCE'] = train_df['SOURCE'].apply(
         lambda gps_meter_list: sliding_window_varying_samplerate(gps_meter_list, seq_len, window_len)
     )
 
-    print("normalizing target")
+    print("Normalizing")
     train_df['POLYLINE'] = train_df['POLYLINE'].transform(lambda arr: (arr - tr_min) / tr_diff)
-    print("normalizing source")
     train_df['SOURCE'] = train_df['SOURCE'].apply(lambda arr: (arr - tr_min) / tr_diff)
+    save_pickle(train_df, get_dataset_file(train_prefix))
 
-    print("saving train dataset")
-    pickle.dump(metadata, open(get_metadata_file(train_prefix), "wb"))
-    train_df.to_pickle(get_dataset_file(train_prefix), compression="gzip")
-    print("saved train dataset")
-
-    # val
-    print("build validation data")
-    val_df = test_df.sample(n=10_000)
+    print("Generate: Validation")
+    val_df = test_df.sample(n=val_size)
     test_df = test_df.loc[~test_df.index.isin(val_df.index)]
     # validation prepared exactly like training data
 
-    val_df['POLYLINE'] = build_behavior_matrix(val_df['POLYLINE'], seq_len, window_len, tr_min, tr_max, tr_diff)
-    val_df['POLYLINE'].to_pickle(get_dataset_file(val_prefix))
+    val_df['POLYLINE'] = build_behavior_matrix(val_df['POLYLINE'], seq_len, window_len, tr_min, tr_diff)
+    save_pickle(val_df['POLYLINE'], get_dataset_file(val_prefix))
 
     # experiment queries
-    print("build query set")
+    print("Experiment: TRAJECTORY SIMILARITY")
     # q - query trajectories
     # p - additional traj from the test set
-    qp = test_df.sample(n=100_000 + 10_000)
-    q = qp[:10_000]
-    p = qp[10_000:]
+    qp = test_df.sample(n=100_000 + test_size)
+    q = qp[:test_size]
+    p = qp[test_size:]
 
-    q_a, q_b = get_subtrajectories(q)
-    p_a, p_b = get_subtrajectories(p)
+    q_a, q_b = get_subtrajectories(q['POLYLINE'])
+    p_a, p_b = get_subtrajectories(p['POLYLINE'])
     query_db = pd.concat([q_b, p_a])  # p_b is ignored as we need only 100_000 traj
 
-    q_a = build_behavior_matrix(q_a, seq_len, window_len, tr_min, tr_max, tr_diff)
-    q_a.to_pickle(get_query_file(test_prefix))
+    q_a = build_behavior_matrix(q_a, seq_len, window_len, tr_min, tr_diff)
+    save_pickle(q_a, get_query_file(test_prefix))
 
-    query_db = build_behavior_matrix(query_db, seq_len, window_len, tr_min, tr_max, tr_diff)
-    query_db.to_pickle(get_database_file(test_prefix))
+    query_db = build_behavior_matrix(query_db, seq_len, window_len, tr_min, tr_diff)
+    save_pickle(query_db, get_database_file(test_prefix))
 
+    print("Experiment: DESTINATION PREDICTION")
+    destination_task_trajectories = test_df.sample(n=test_size)
 
-def build_behavior_matrix(df, seq_len, window_len, tr_min, tr_max, tr_diff):
-    df = df.transform(lambda gps_meter_list: sliding_window(gps_meter_list, seq_len, window_len))
-    df = df.transform(lambda arr: (arr - tr_min) / tr_diff)
-    return df
+    destinations = destination_task_trajectories['POLYLINE'].apply(lambda trip: trip[-1])
+    save_pickle(destinations, get_dataset_file(test_prefix, suffix="destinations"))
+
+    destination_task_trajectories['POLYLINE'] = destination_task_trajectories['POLYLINE'].apply(
+        lambda trip: trip[:int(len(trip) * 0.8)]
+    )
+    trajectory_queries = build_behavior_matrix(
+        destination_task_trajectories['POLYLINE'], seq_len, window_len, tr_min, tr_diff
+    )
+    save_pickle(trajectory_queries, get_dataset_file(test_prefix, suffix="dp-trajectories"))
+
+    print("Experiment: TRAVEL-TIME ESTIMATION")
+    traveltime_task_data = test_df.sample(n=test_size)
+    travel_durations = traveltime_task_data['POLYLINE'].apply(lambda trip: len(trip) * 15)
+    save_pickle(travel_durations, get_dataset_file(test_prefix, suffix="duration"))
+
+    queries = build_behavior_matrix(
+        traveltime_task_data['POLYLINE'],
+        seq_len,
+        window_len,
+        tr_min,
+        tr_diff,
+        window_fn=sliding_window,
+        show_timestamps=False
+    )
+    save_pickle(queries, get_dataset_file(test_prefix, suffix="tte-ds_0.0"))
+
+    for rate in [0.2, 0.4, 0.6]:
+        print(f"downsampling rate : {rate}")
+        downsampled_d = traveltime_task_data['POLYLINE'].apply(lambda trip: downsampling(trip, rate))
+        downsampled_queries = build_behavior_matrix(
+            downsampled_d,
+            seq_len,
+            window_len,
+            tr_min,
+            tr_diff,
+            window_fn=sliding_window_varying_samplerate,
+            show_timestamps=False
+        )
+        save_pickle(downsampled_queries, get_dataset_file(test_prefix, suffix=f"tte-ds_{rate}"))
 
 
 def gps2meters(polyline: List):
@@ -159,7 +147,7 @@ def gps2meters(polyline: List):
     return np.vstack((x, y, timesteps)).T
 
 
-def sliding_window(arr: np.array, window_size_seconds: int, slide_step_seconds: int):
+def sliding_window(arr: np.array, window_size_seconds: int, slide_step_seconds: int, show_timestamps=True):
     if arr is None:
         return []
 
@@ -169,9 +157,9 @@ def sliding_window(arr: np.array, window_size_seconds: int, slide_step_seconds: 
     output_len = 1 + max(0, int(math.ceil((arr.shape[0] - window_size) / slide_step)))
     """
     make sure windowing does not need padding
-    
+
     """
-    movement_features = calc_car_movement_features(arr)
+    movement_features, _ = calc_car_movement_features(arr, show_timestamps=show_timestamps)
 
     if movement_features is None:
         return []
@@ -184,35 +172,52 @@ def sliding_window(arr: np.array, window_size_seconds: int, slide_step_seconds: 
     return [element for element in windowed_results if element is not None]
 
 
-def sliding_window_varying_samplerate(arr: np.array, window_size_seconds: int, slide_step_seconds: int):
-    movement_features = calc_car_movement_features(arr)
+def sliding_window_varying_samplerate(
+    arr: np.array, window_size_seconds: int, slide_step_seconds: int, show_timestamps=True
+):
+    movement_features, timesteps = calc_car_movement_features(arr, show_timestamps=show_timestamps)
 
     if movement_features is None:
         return []
 
-    windows = rolling_window(movement_features, window_size_seconds, slide_step_seconds)
+    windows = rolling_window(movement_features, timesteps, window_size_seconds, slide_step_seconds)
 
     windowed_results = [calc_feature_stat_matrix(np.array(window)) for window in windows]
 
     return [element for element in windowed_results if element is not None]
 
 
-def rolling_window(sample, windowsize, offset):
-    timeLength = sample[len(sample) - 1][0]
+def build_behavior_matrix(
+    df: pd.Series,
+    seq_len: int,
+    window_len: int,
+    tr_min: np.array,
+    tr_diff: np.array,
+    window_fn=sliding_window,
+    show_timestamps=True
+):
+    df = df.apply(
+        lambda gps_meter_list: window_fn(gps_meter_list, seq_len, window_len, show_timestamps=show_timestamps)
+    )
+    df = df.apply(lambda arr: (arr - tr_min) / tr_diff)
+    return df
+
+
+def rolling_window(sample, timesteps, windowsize, offset):
+    timeLength = timesteps[len(sample) - 1]
     windowLength = int(timeLength / offset) + 1
     windows = []
     for i in range(0, windowLength):
         windows.append([])
 
-    for record in sample:
-        time = record[0]
+    for time, record in zip(timesteps, sample):
         for i in range(0, windowLength):
             if (time > (i * offset)) & (time < (i * offset + windowsize)):
                 windows[i].append(record)
     return windows
 
 
-def calc_car_movement_features(arr: np.array):
+def calc_car_movement_features(arr: np.array, show_timestamps=True):
     if arr.shape[0] <= 2:
         return None
 
@@ -230,14 +235,14 @@ def calc_car_movement_features(arr: np.array):
 
     return np.column_stack(
         (
-            timesteps,
+            timesteps if show_timestamps else np.zeros_like(timesteps),
             np.pad(velocity_norm, (seq_len - velocity_norm.shape[0], 0), 'constant'),
             np.pad(diff_velocity_norm, (seq_len - diff_velocity_norm.shape[0], 0), 'constant'),
             np.pad(acceleration_norm, (seq_len - acceleration_norm.shape[0], 0), 'constant'),
             np.pad(diff_acceleration_norm, (seq_len - diff_acceleration_norm.shape[0], 0), 'constant'),
             np.pad(angular_velocity, (seq_len - angular_velocity.shape[0], 0), 'constant'),
         )
-    )
+    ), timesteps
 
 
 def calc_feature_stat_matrix(x: np.ndarray):
@@ -256,53 +261,13 @@ def calc_feature_stat_matrix(x: np.ndarray):
     )
 
 
-def compute_mean_std(df: pd.DataFrame):
-    _mean = df['POLYLINE'].transform(lambda arr: np.mean(arr, 0, keepdims=True)).to_numpy().mean()
-    _std = df['POLYLINE'].transform(lambda arr: np.mean(arr, 0, keepdims=True)).to_numpy().std()
-    # df['POLYLINE'] = df['POLYLINE'].transform(lambda arr: (arr - _mean) / _std)
-    return _mean, _std
-
-
 def compute_min_max(df: pd.DataFrame):
-    _min = df['POLYLINE'].transform(lambda arr: np.min(arr, 0, initial=FLOAT_MAX)).to_list()
-    _max = df['POLYLINE'].transform(lambda arr: np.max(arr, 0, initial=FLOAT_MIN)).to_list()
+    _min = df['POLYLINE'].apply(lambda arr: np.min(arr, 0, initial=FLOAT_MAX)).to_list()
+    _max = df['POLYLINE'].apply(lambda arr: np.max(arr, 0, initial=FLOAT_MIN)).to_list()
 
     _min = np.min(_min, axis=0)
     _max = np.max(_max, axis=0)
     return _min, _max
-
-
-def normalize_local_metrics(df: pd.DataFrame):
-    df['POLYLINE'] = df['POLYLINE'].transform(lambda arr: (arr - np.mean(arr, 0)) / np.std(arr, 0))
-
-
-def apply_gaussian_noise(lst: List):
-    trip = distort_gps_array(lst, .22, 50)
-    trip[0] = lst[0]
-    trip[-1] = lst[-1]
-    return trip
-
-
-def apply_downsampling(lst: List):
-    return downsample_gps_array(lst, rate=DOWNSAMPLING_RATES[np.random.randint(0, 4 + 1)])
-
-
-def downsampling_distort(trip: np.ndarray):
-    noise_trips = []
-    dropping_rates = [0, 0.2, 0.4, 0.6]
-    distorting_rates = [0, 0.3, 0.6]
-    for dropping_rate in dropping_rates:
-        noisetrip1 = downsampling(trip, dropping_rate)
-        for distorting_rate in distorting_rates:
-            noisetrip2 = distort(noisetrip1, distorting_rate)
-            noise_trips.append(noisetrip2)
-    return noise_trips
-
-
-def get_subtrajectories(df: pd.DataFrame):
-    df_a = df['POLYLINE'].transform(lambda polyline_list: polyline_list[::2])
-    df_b = df['POLYLINE'].transform(lambda polyline_list: polyline_list[1::2])
-    return df_a, df_b
 
 
 if __name__ == '__main__':
@@ -314,6 +279,4 @@ if __name__ == '__main__':
     ray.shutdown()
     ray.init()
 
-    prepare_taxi_data(
-        in_file="../data/train.csv", out_prefix="../data/train-trajectory2vec-v3", seq_len=300, window_len=150
-    )
+    prepare_taxi_data(in_file="../data/train.csv", out_prefix="../data/trajectory2vec", seq_len=300, window_len=150)
