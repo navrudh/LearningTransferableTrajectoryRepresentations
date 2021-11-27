@@ -25,6 +25,9 @@ def distort_gps_array(trip: List[Tuple[float]], rate: float, radius=50.0):
 
 
 def distort(gps_meters: np.array, rate: float, radius=50.0):
+    if rate == 0:
+        return gps_meters
+
     noise_trajectory = np.copy(gps_meters)
     N = gps_meters.shape[0]
     noise = 2 * np.random.random_sample((N, 2)) - 1

@@ -2,6 +2,8 @@ import numpy as np
 
 
 def downsampling(arr: np.array, rate: float):
+    if rate == 0.0:
+        return arr
     keep = np.random.random_sample(size=arr.shape[0])
     keep[0] = 1
     keep[-1] = 1

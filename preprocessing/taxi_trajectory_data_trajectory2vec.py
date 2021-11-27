@@ -1,23 +1,23 @@
 """
 
-Preparing trajectory2vec data similar to t2vec, to run identical experiments
+Prepare trajectory2vec data
 
-script version: v3
+script version: v4
 
 """
 
 import json
 import math
 import random
-from typing import List
+from typing import List, Union
 
 import modin.pandas as pd
 import numpy as np
 
-from preprocessing.common import DATASET_SAMPLE_RATE, downsampling_distort, EPSILON, FLOAT_MAX, FLOAT_MIN, \
+from preprocessing.common import DATASET_SAMPLE_RATE, EPSILON, FLOAT_MAX, FLOAT_MIN, \
     get_database_file, get_dataset_file, get_query_file, get_subtrajectories, panda_types, save_pickle
 from utils.array import downsampling
-from utils.gps import lonlat2meters
+from utils.gps import distort, lonlat2meters
 
 
 def prepare_taxi_data(in_file: str, out_prefix: str, seq_len=600, window_len=300):
@@ -43,8 +43,8 @@ def prepare_taxi_data(in_file: str, out_prefix: str, seq_len=600, window_len=300
 
     print("Processing Train")
 
-    # create source data
-    train_df['SOURCE'] = train_df['POLYLINE'].transform(lambda gps_meter_list: downsampling_distort(gps_meter_list))
+    # save original trip trajectories
+    original_trips = train_df['POLYLINE'].copy()
 
     # process target data
     train_df['POLYLINE'] = train_df['POLYLINE'].transform(
@@ -54,9 +54,9 @@ def prepare_taxi_data(in_file: str, out_prefix: str, seq_len=600, window_len=300
     tr_min, tr_max = compute_min_max(train_df)
     tr_diff = tr_max - tr_min
 
+    train_df = generate_input_trajectories(original_trips, train_df)
+
     # process source data
-    train_df['SOURCE'] = train_df['SOURCE'].explode()
-    # source = source.rename_axis('target_idx').reset_index()
     train_df['SOURCE'] = train_df['SOURCE'].apply(
         lambda gps_meter_list: sliding_window_varying_samplerate(gps_meter_list, seq_len, window_len)
     )
@@ -137,6 +137,26 @@ def prepare_taxi_data(in_file: str, out_prefix: str, seq_len=600, window_len=300
         save_pickle(downsampled_queries, get_dataset_file(test_prefix, suffix=f"tte-ds_{rate}"))
 
 
+def generate_input_trajectories(original_trips, train_df):
+    print("Generating Input Sequences")
+    temp_df = None
+    drop_rates = [0.0, 0.2, 0.4, 0.6]
+    distortion_rates = [0.0, 0.3, 0.6]
+    for drop_rate in drop_rates:
+        for distortion_rate in distortion_rates:
+            print(f"Drop Rate: {drop_rate}; Distortion Rate: {distortion_rate}")
+            cloned_df = train_df.copy(deep=False)
+            cloned_df['SOURCE'] = original_trips.apply(
+                lambda trip: distort(downsampling(trip, drop_rate), distortion_rate)
+            )
+            if temp_df is None:
+                temp_df = cloned_df
+            else:
+                temp_df = pd.concat([temp_df, cloned_df])
+    train_df = temp_df
+    return train_df
+
+
 def gps2meters(polyline: List):
     if len(polyline) == 0 or polyline is None:
         return None
@@ -203,23 +223,23 @@ def build_behavior_matrix(
     return df
 
 
-def rolling_window(sample, timesteps, windowsize, offset):
-    timeLength = timesteps[len(sample) - 1]
-    windowLength = int(timeLength / offset) + 1
+def rolling_window(sample, timesteps, window_size, offset):
+    time_length = timesteps[len(sample) - 1]
+    window_length = int(time_length / offset) + 1
     windows = []
-    for i in range(0, windowLength):
+    for i in range(0, window_length):
         windows.append([])
 
     for time, record in zip(timesteps, sample):
-        for i in range(0, windowLength):
-            if (time > (i * offset)) & (time < (i * offset + windowsize)):
+        for i in range(0, window_length):
+            if (time > (i * offset)) & (time < (i * offset + window_size)):
                 windows[i].append(record)
     return windows
 
 
-def calc_car_movement_features(arr: np.array, show_timestamps=True):
+def calc_car_movement_features(arr: np.array, show_timestamps=True) -> (Union[np.array, None], Union[np.array, None]):
     if arr.shape[0] <= 2:
-        return None
+        return None, None
 
     gps_pos = arr[:, [0, 1]]
     timesteps = arr[:, 2]
