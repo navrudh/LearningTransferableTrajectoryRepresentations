@@ -53,16 +53,14 @@ def prepare_taxi_data(in_file: str, out_prefix: str, seq_len=600, window_len=300
     # normalization
     tr_min, tr_max = compute_min_max(train_df)
     tr_diff = tr_max - tr_min
+    train_df['POLYLINE'] = train_df['POLYLINE'].transform(lambda arr: (arr - tr_min) / tr_diff)
 
+    # generate and process input data
     train_df = generate_input_trajectories(original_trips, train_df)
-
-    # process source data
     train_df['SOURCE'] = train_df['SOURCE'].apply(
         lambda gps_meter_list: sliding_window_varying_samplerate(gps_meter_list, seq_len, window_len)
     )
-
-    print("Normalizing")
-    train_df['POLYLINE'] = train_df['POLYLINE'].transform(lambda arr: (arr - tr_min) / tr_diff)
+    train_df = train_df[train_df['SOURCE'].map(len) != 0]
     train_df['SOURCE'] = train_df['SOURCE'].apply(lambda arr: (arr - tr_min) / tr_diff)
     save_pickle(train_df, get_dataset_file(train_prefix))
 
@@ -125,15 +123,21 @@ def prepare_taxi_data(in_file: str, out_prefix: str, seq_len=600, window_len=300
     for rate in [0.2, 0.4, 0.6]:
         print(f"downsampling rate : {rate}")
         downsampled_d = traveltime_task_data['POLYLINE'].apply(lambda trip: downsampling(trip, rate))
-        downsampled_queries = build_behavior_matrix(
-            downsampled_d,
-            seq_len,
-            window_len,
-            tr_min,
-            tr_diff,
-            window_fn=sliding_window_varying_samplerate,
-            show_timestamps=False
+        downsampled_d = downsampled_d.apply(
+            lambda gps_meter_list: sliding_window_varying_samplerate(gps_meter_list, seq_len, window_len)
         )
+        downsampled_d = downsampled_d[downsampled_d.map(len) != 0]
+        downsampled_queries = downsampled_d.apply(lambda arr: (arr - tr_min) / tr_diff)
+        # downsampled_queries = build_behavior_matrix(
+        #     downsampled_d,
+        #     seq_len,
+        #     window_len,
+        #     tr_min,
+        #     tr_diff,
+        #     window_fn=sliding_window_varying_samplerate,
+        #     show_timestamps=False
+        # )
+
         save_pickle(downsampled_queries, get_dataset_file(test_prefix, suffix=f"tte-ds_{rate}"))
 
 
@@ -226,12 +230,10 @@ def build_behavior_matrix(
 def rolling_window(sample, timesteps, window_size, offset):
     time_length = timesteps[len(sample) - 1]
     window_length = int(time_length / offset) + 1
-    windows = []
-    for i in range(0, window_length):
-        windows.append([])
+    windows = [[] for _ in range(window_length)]
 
     for time, record in zip(timesteps, sample):
-        for i in range(0, window_length):
+        for i in range(window_length):
             if (time > (i * offset)) & (time < (i * offset + window_size)):
                 windows[i].append(record)
     return windows
