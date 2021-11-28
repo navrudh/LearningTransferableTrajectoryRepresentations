@@ -14,7 +14,7 @@ from typing import List, Union
 import modin.pandas as pd
 import numpy as np
 
-from preprocessing.common import DATASET_SAMPLE_RATE, EPSILON, FLOAT_MAX, FLOAT_MIN, \
+from preprocessing.common import DATASET_SAMPLE_RATE, downsampling_distort, EPSILON, FLOAT_MAX, FLOAT_MIN, \
     get_database_file, get_dataset_file, get_query_file, get_subtrajectories, panda_types, save_pickle
 from utils.array import downsampling
 from utils.gps import distort, lonlat2meters
@@ -43,8 +43,8 @@ def prepare_taxi_data(in_file: str, out_prefix: str, seq_len=600, window_len=300
 
     print("Processing Train")
 
-    # save original trip trajectories
-    original_trips = train_df['POLYLINE'].copy()
+    # create source data
+    train_df['SOURCE'] = train_df['POLYLINE'].transform(lambda gps_meter_list: downsampling_distort(gps_meter_list))
 
     # process target data
     train_df['POLYLINE'] = train_df['POLYLINE'].transform(
@@ -55,13 +55,14 @@ def prepare_taxi_data(in_file: str, out_prefix: str, seq_len=600, window_len=300
     tr_diff = tr_max - tr_min
     train_df['POLYLINE'] = train_df['POLYLINE'].transform(lambda arr: (arr - tr_min) / tr_diff)
 
-    # generate and process input data
-    train_df = generate_input_trajectories(original_trips, train_df)
+    # process source data
+    train_df['SOURCE'] = train_df['SOURCE'].explode()
+    print("exploded 'source' dataset")
     train_df['SOURCE'] = train_df['SOURCE'].apply(
         lambda gps_meter_list: sliding_window_varying_samplerate(gps_meter_list, seq_len, window_len)
     )
     train_df = train_df[train_df['SOURCE'].map(len) != 0]
-    train_df['SOURCE'] = train_df['SOURCE'].apply(lambda arr: (arr - tr_min) / tr_diff)
+    train_df['SOURCE'] = train_df['SOURCE'].transform(lambda arr: (arr - tr_min) / tr_diff)
     save_pickle(train_df, get_dataset_file(train_prefix))
 
     print("Generate: Validation")
@@ -197,7 +198,7 @@ def sliding_window(arr: np.array, window_size_seconds: int, slide_step_seconds: 
 
 
 def sliding_window_varying_samplerate(
-    arr: np.array, window_size_seconds: int, slide_step_seconds: int, show_timestamps=True
+        arr: np.array, window_size_seconds: int, slide_step_seconds: int, show_timestamps=True
 ):
     movement_features, timesteps = calc_car_movement_features(arr, show_timestamps=show_timestamps)
 
@@ -212,13 +213,13 @@ def sliding_window_varying_samplerate(
 
 
 def build_behavior_matrix(
-    df: pd.Series,
-    seq_len: int,
-    window_len: int,
-    tr_min: np.array,
-    tr_diff: np.array,
-    window_fn=sliding_window,
-    show_timestamps=True
+        df: pd.Series,
+        seq_len: int,
+        window_len: int,
+        tr_min: np.array,
+        tr_diff: np.array,
+        window_fn=sliding_window,
+        show_timestamps=True
 ):
     df = df.apply(
         lambda gps_meter_list: window_fn(gps_meter_list, seq_len, window_len, show_timestamps=show_timestamps)
