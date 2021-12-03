@@ -19,6 +19,17 @@ class FrameEncodedPortoTaxiValDataset(Dataset):
                torch.from_numpy(np.copy(self.porto_df.iloc[idx]))
 
 
+class FrameEncodedTrajectoryDatasetWithIndex(Dataset):
+    def __init__(self, pickle_file):
+        self.porto_df = pd.read_pickle(os.path.realpath(pickle_file), compression="gzip")
+
+    def __len__(self):
+        return len(self.porto_df)
+
+    def __getitem__(self, idx):
+        return torch.from_numpy(np.copy(self.porto_df.iloc[idx])), idx
+
+
 class FrameEncodedPortoTaxiTrainDataset(Dataset):
     def __init__(self, pickle_file):
         self.porto_df = pd.read_pickle(os.path.realpath(pickle_file), compression="gzip")

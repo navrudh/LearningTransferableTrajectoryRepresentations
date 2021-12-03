@@ -35,6 +35,16 @@ def get_dataset_file(path, suffix=None):
     return path
 
 
+def get_trajectories_file(path, suffix=None):
+    if suffix is not None:
+        filename = "-".join([path, suffix])
+    else:
+        filename = path
+    path = Path(f"{filename}.trajectories.pkl")
+    print(f"Trajectories File: {path}")
+    return path
+
+
 def get_database_file(path):
     path = Path(f"{path}.query_database.pkl")
     print(f"Database File: {path}")

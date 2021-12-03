@@ -52,10 +52,11 @@ data_collator = DataCollatorForLanguageModeling(
 )
 logger.info("Data collator loaded")
 
+model_path = "../data/models/roberta/v1-8epoch"
 training_args = TrainingArguments(
-    output_dir="../data/models/roberta",
+    output_dir=model_path,
     overwrite_output_dir=True,
-    num_train_epochs=2,
+    num_train_epochs=8,
     per_device_train_batch_size=80,
     per_device_eval_batch_size=80,
     save_steps=10_000,
@@ -72,4 +73,4 @@ trainer = Trainer(
 logger.info("Begin training")
 trainer.train()
 logger.info("End training")
-trainer.save_model("../data/models/roberta/geohashcode-model")
+trainer.save_model(f"{model_path}/final")

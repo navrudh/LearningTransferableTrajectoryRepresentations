@@ -13,6 +13,9 @@ from models.linear_regression import LinearRegression
 
 
 def run_traveltime_estimation_experiment(query_result_file: str, target_file: str):
+    print("Query: " + query_result_file)
+    print("DB:    " + target_file)
+
     pl.seed_everything(42)
 
     data = pickle.load(open(query_result_file, 'rb'))

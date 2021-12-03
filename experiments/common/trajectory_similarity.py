@@ -40,3 +40,4 @@ def run_trajectory_similarity_experiment(query_results_file: str, db_results_fil
     print("Database Len:", len(query_database_results))
     print("M:", m)
     print("Mean Rank:", mean_rank)
+    print("---")

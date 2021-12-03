@@ -5,7 +5,7 @@ import torch.optim
 from torch.nn import functional as F
 from torch.nn.utils.rnn import PackedSequence, pad_packed_sequence
 
-from common import run_experiment
+from baselines.common import run_experiment
 from models.trajectory2vec import EncoderDecoder
 
 
@@ -41,5 +41,5 @@ class BaselineTrajectory2VecExperiment(pl.LightningModule):
 
 if __name__ == '__main__':
     model = BaselineTrajectory2VecExperiment(input_size=36)
-    trainer = run_experiment(model=model, gpus=[1], path_prefix='../data/train-trajectory2vec-v3')
-    trainer.save_checkpoint("../data/trajectory2vec-v3.ckpt")
+    trainer = run_experiment(model=model, gpus=[1], path_prefix='../data/trajectory2vec-show-timestamp/trajectory2vec')
+    trainer.save_checkpoint("../data/models/trajectory2vec-show-timestamp.ckpt")

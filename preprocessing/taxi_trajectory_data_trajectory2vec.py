@@ -15,7 +15,7 @@ import modin.pandas as pd
 import numpy as np
 
 from preprocessing.common import DATASET_SAMPLE_RATE, downsampling_distort, EPSILON, FLOAT_MAX, FLOAT_MIN, \
-    get_database_file, get_dataset_file, get_query_file, get_subtrajectories, panda_types, save_pickle
+    get_dataset_file, get_query_file, get_subtrajectories, get_trajectories_file, panda_types, save_pickle
 from utils.array import downsampling
 from utils.gps import distort, lonlat2meters
 
@@ -88,11 +88,33 @@ def prepare_taxi_data(in_file: str, out_prefix: str, seq_len=600, window_len=300
     p_a, p_b = get_subtrajectories(p['POLYLINE'])
     query_db = pd.concat([q_b, p_a])  # p_b is ignored as we need only 100_000 traj
 
+    save_pickle(q_a, get_trajectories_file(test_prefix, suffix="query"))
+    save_pickle(query_db, get_trajectories_file(test_prefix, suffix="db"))
+
     q_a = build_behavior_matrix(q_a, seq_len, window_len, tr_min, tr_diff, show_timestamps=show_timestamps)
     save_pickle(q_a, get_query_file(test_prefix))
 
     query_db = build_behavior_matrix(query_db, seq_len, window_len, tr_min, tr_diff, show_timestamps=show_timestamps)
-    save_pickle(query_db, get_database_file(test_prefix))
+    save_pickle(query_db, get_dataset_file(test_prefix))
+
+    d_sim = test_df.sample(n=test_size)
+    save_pickle(d_sim['POLYLINE'], get_trajectories_file(test_prefix, suffix="similarity"))
+
+    d_sim_processed = build_behavior_matrix(
+        d_sim['POLYLINE'], seq_len, window_len, tr_min, tr_diff, show_timestamps=show_timestamps
+    )
+    save_pickle(d_sim_processed, get_dataset_file(test_prefix, suffix="similarity-ds_0.0"))
+
+    for rate in [0.2, 0.4, 0.6]:
+        print(f"downsampling rate : {rate}")
+        downsampled_d_sim = d_sim['POLYLINE'].apply(lambda trip: downsampling(trip, rate))
+        downsampled_d_sim = downsampled_d_sim.apply(
+            lambda gps_meter_list:
+            sliding_window_varying_samplerate(gps_meter_list, seq_len, window_len, show_timestamps=show_timestamps)
+        )
+        downsampled_d_sim = downsampled_d_sim.apply(lambda arr: (arr - tr_min) / tr_diff)
+
+        save_pickle(downsampled_d_sim, get_dataset_file(test_prefix, suffix=f"similarity-ds_{rate}"))
 
     print("Experiment: DESTINATION PREDICTION")
     destination_task_trajectories = test_df.sample(n=test_size)
@@ -111,7 +133,18 @@ def prepare_taxi_data(in_file: str, out_prefix: str, seq_len=600, window_len=300
         tr_diff,
         show_timestamps=show_timestamps
     )
-    save_pickle(trajectory_queries, get_dataset_file(test_prefix, suffix="dp-trajectories"))
+    save_pickle(trajectory_queries, get_dataset_file(test_prefix, suffix="dp-traj-ds_0.0"))
+
+    for rate in [0.2, 0.4, 0.6]:
+        print(f"downsampling rate : {rate}")
+        downsampled_d_dp = destination_task_trajectories['POLYLINE'].apply(lambda trip: downsampling(trip, rate))
+        downsampled_d_dp = downsampled_d_dp.apply(
+            lambda gps_meter_list:
+            sliding_window_varying_samplerate(gps_meter_list, seq_len, window_len, show_timestamps=show_timestamps)
+        )
+        downsampled_d_dp = downsampled_d_dp.apply(lambda arr: (arr - tr_min) / tr_diff)
+
+        save_pickle(downsampled_d_dp, get_dataset_file(test_prefix, suffix=f"dp-traj-ds_{rate}"))
 
     print("Experiment: TRAVEL-TIME ESTIMATION")
     traveltime_task_data = test_df.sample(n=test_size)
@@ -131,13 +164,12 @@ def prepare_taxi_data(in_file: str, out_prefix: str, seq_len=600, window_len=300
 
     for rate in [0.2, 0.4, 0.6]:
         print(f"downsampling rate : {rate}")
-        downsampled_d = traveltime_task_data['POLYLINE'].apply(lambda trip: downsampling(trip, rate))
-        downsampled_d = downsampled_d.apply(
+        downsampled_d_tte = traveltime_task_data['POLYLINE'].apply(lambda trip: downsampling(trip, rate))
+        downsampled_d_tte = downsampled_d_tte.apply(
             lambda gps_meter_list:
             sliding_window_varying_samplerate(gps_meter_list, seq_len, window_len, show_timestamps=show_timestamps)
         )
-        downsampled_d = downsampled_d[downsampled_d.map(len) != 0]
-        downsampled_queries = downsampled_d.apply(lambda arr: (arr - tr_min) / tr_diff)
+        downsampled_queries = downsampled_d_tte.apply(lambda arr: (arr - tr_min) / tr_diff)
 
         save_pickle(downsampled_queries, get_dataset_file(test_prefix, suffix=f"tte-ds_{rate}"))
 
@@ -304,8 +336,8 @@ if __name__ == '__main__':
 
     prepare_taxi_data(
         in_file="../data/train.csv",
-        out_prefix="../data/trajectory2vec-no_timestamps",
+        out_prefix="../data/trajectory2vec-show_timestamps_3/trajectory2vec",
         seq_len=300,
         window_len=150,
-        show_timestamps=False
+        show_timestamps=True
     )

@@ -1,14 +1,15 @@
 import pickle
 
+import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from datasets_impl.taxi_porto import FrameEncodedPortoTaxiValDataset
-from experiments.baseline_trajectory2vec import BaselineTrajectory2VecExperiment
+from baselines.baseline_trajectory2vec import BaselineTrajectory2VecExperiment
+from datasets_impl.taxi_porto import FrameEncodedTrajectoryDatasetWithIndex
 
 
 def load_eval_model(path: str, **kwargs):
-    model = BaselineTrajectory2VecExperiment.load_from_checkpoint(path, **kwargs)
+    model = BaselineTrajectory2VecExperiment.load_from_checkpoint(path, map_location=torch.device("cuda:0"), **kwargs)
     model.double()
     model.eval()
     return model
@@ -23,7 +24,9 @@ def process_queries(query_file, results_file, eval_model: BaselineTrajectory2Vec
     :param eval_model: the model that processes queries to results
     :return: None
     """
-    dataset = FrameEncodedPortoTaxiValDataset(query_file)
+    print("query_file:", query_file)
+
+    dataset = FrameEncodedTrajectoryDatasetWithIndex(query_file)
     loader = DataLoader(dataset)
 
     test_results = []
@@ -37,14 +40,33 @@ def process_queries(query_file, results_file, eval_model: BaselineTrajectory2Vec
 
 
 if __name__ == '__main__':
-    eval_model = load_eval_model(path="../../data/trajectory2vec-v3.ckpt", input_size=36)
-    process_queries(
-        query_file="../../data/train-trajectory2vec-v3.test.query.pkl",
-        results_file="../../data/train-trajectory2vec-v3.test.query.results.pkl",
-        eval_model=eval_model
-    )
-    process_queries(
-        query_file="../../data/train-trajectory2vec-v3.test.query_database.pkl",
-        results_file="../../data/train-trajectory2vec-v3.test.query_database.results.pkl",
-        eval_model=eval_model
-    )
+    data_dir = "../../data"
+
+    eval_model = load_eval_model(path=f"{data_dir}/models/trajectory2vec-show-timestamp.ckpt", input_size=36)
+
+    experiment_data_dir = "trajectory2vec-show_timestamps_2"
+    input_files = [
+        # destination prediction
+        "trajectory2vec.test-dp-traj-ds_0.0.dataframe.pkl",
+        "trajectory2vec.test-dp-traj-ds_0.2.dataframe.pkl",
+        "trajectory2vec.test-dp-traj-ds_0.4.dataframe.pkl",
+        "trajectory2vec.test-dp-traj-ds_0.6.dataframe.pkl",
+        # travel time estimation
+        "trajectory2vec.test-tte-ds_0.0.dataframe.pkl",
+        "trajectory2vec.test-tte-ds_0.2.dataframe.pkl",
+        "trajectory2vec.test-tte-ds_0.4.dataframe.pkl",
+        "trajectory2vec.test-tte-ds_0.6.dataframe.pkl",
+        # similarity
+        "trajectory2vec.test.query.pkl",
+        "trajectory2vec.test-similarity-ds_0.2.dataframe.pkl",
+        "trajectory2vec.test-similarity-ds_0.4.dataframe.pkl",
+        "trajectory2vec.test-similarity-ds_0.6.dataframe.pkl",
+        "trajectory2vec.test.query_database.pkl",
+    ]
+
+    for file in input_files:
+        process_queries(
+            query_file=f"{data_dir}/{experiment_data_dir}/{file}",
+            results_file=f"{data_dir}/{experiment_data_dir}/{file}".replace(".pkl", ".results.pkl"),
+            eval_model=eval_model
+        )
