@@ -16,7 +16,7 @@ import geohash2
 import modin.pandas as pd
 import numpy as np
 
-from preprocessing.common import downsampling_distort, get_database_file, get_dataset_file, get_query_file, \
+from preprocessing.common import downsampling_distort, get_dataset_file, get_query_file, \
     get_subtrajectories, panda_types, save_pickle
 from utils.array import downsampling
 from utils.gps import lonlat2meters, meters2lonlat
@@ -99,16 +99,33 @@ def prepare_taxi_data(in_file: str, out_prefix: str):
     save_csv(q_a, get_query_file(test_prefix))
 
     query_db = query_db.apply(lambda geohash_list: " ".join(geohash_list))
-    save_csv(query_db, get_database_file(test_prefix))
+    save_csv(query_db, get_dataset_file(test_prefix))
+
+    d_sim = test_series.sample(n=test_size)
+
+    d_sim_processed = d_sim.apply(lambda geohash_list: " ".join(geohash_list))
+    save_csv(d_sim_processed, get_dataset_file(test_prefix, suffix="similarity-ds_0.0"))
+
+    for rate in [0.2, 0.4, 0.6]:
+        print(f"downsampling rate : {rate}")
+        downsampled_d_sim = d_sim.apply(lambda trip: downsampling(np.array(trip), rate).tolist())
+        downsampled_d_sim = downsampled_d_sim.apply(lambda geohash_list: " ".join(geohash_list))
+        save_csv(downsampled_d_sim, get_dataset_file(test_prefix, suffix=f"similarity-ds_{rate}"))
 
     print("Experiment: DESTINATION PREDICTION")
     destination_task_data = test_series.sample(n=test_size)
     destinations = destination_task_data.apply(lambda trip: geohash2.decode_exactly(trip[-1]))
     save_pickle(destinations, get_dataset_file(test_prefix, suffix="destinations"))
 
-    destination_task_trajectories = destination_task_data.apply(lambda trip: trip[:int(len(trip) * 0.8)])
-    destination_task_trajectories = destination_task_trajectories.apply(lambda geohash_list: " ".join(geohash_list))
-    save_csv(destination_task_trajectories, get_dataset_file(test_prefix, suffix="dp-trajectories"))
+    d_dp = destination_task_data.apply(lambda trip: trip[:int(len(trip) * 0.8)])
+    d_dp_processed = d_dp.apply(lambda geohash_list: " ".join(geohash_list))
+    save_csv(d_dp_processed, get_dataset_file(test_prefix, suffix="dp-traj-ds_0.0"))
+
+    for rate in [0.2, 0.4, 0.6]:
+        print(f"downsampling rate : {rate}")
+        downsampled_d_dp = d_dp.apply(lambda trip: downsampling(np.array(trip), rate).tolist())
+        downsampled_d_dp = downsampled_d_dp.apply(lambda geohash_list: " ".join(geohash_list))
+        save_csv(downsampled_d_dp, get_dataset_file(test_prefix, suffix=f"dp-traj-ds_{rate}"))
 
     print("Experiment: TRAVEL-TIME ESTIMATION")
     traveltime_task_data = test_series.sample(n=test_size)
@@ -154,4 +171,4 @@ if __name__ == '__main__':
     ray.shutdown()
     ray.init()
 
-    prepare_taxi_data(in_file="../data/train.csv", out_prefix="../data/train-transformer")
+    prepare_taxi_data(in_file="../data/train.csv", out_prefix="../data/geohash_1/geohash")
