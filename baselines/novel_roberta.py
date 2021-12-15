@@ -9,7 +9,7 @@ from transformers import (
 logger = logging.getLogger("experiment-logger")
 
 tokenizer = PreTrainedTokenizerFast(
-    tokenizer_file="../data/simulated/tokenizer-geohash-bbpe.json",
+    tokenizer_file="../data/tokenizer-geohash-bbpe.json",
     bos_token="<s>",
     eos_token="</s>",
     pad_token="<pad>",
@@ -25,8 +25,8 @@ def encode(batch):
 dataset = load_dataset(
     'text',
     data_files={
-        'train': '../data/simulated/train.train.dataframe.pkl.csv',
-        'validation': '../data/simulated/test.train.dataframe.pkl.csv'
+        'train': '../data/train-transformer.train.dataframe.pkl.csv',
+        'validation': '../data/train-transformer.val.dataframe.pkl.csv'
     }
 )
 dataset.set_transform(encode)
@@ -35,7 +35,7 @@ config = RobertaConfig(
     vocab_size=tokenizer.vocab_size,
     hidden_size=256,
     num_hidden_layers=3,
-    max_position_embeddings=256,
+    max_position_embeddings=512,
     num_attention_heads=8,
     type_vocab_size=1
 )
@@ -52,12 +52,13 @@ data_collator = DataCollatorForLanguageModeling(
 )
 logger.info("Data collator loaded")
 
+model_path = "../data/models/roberta/v1-8epoch"
 training_args = TrainingArguments(
-    output_dir="../data/simulated/models/roberta",
+    output_dir=model_path,
     overwrite_output_dir=True,
-    num_train_epochs=2,
-    per_device_train_batch_size=16,
-    per_device_eval_batch_size=16,
+    num_train_epochs=8,
+    per_device_train_batch_size=80,
+    per_device_eval_batch_size=80,
     save_steps=10_000,
     save_total_limit=2,
     remove_unused_columns=False,
@@ -72,4 +73,4 @@ trainer = Trainer(
 logger.info("Begin training")
 trainer.train()
 logger.info("End training")
-trainer.save_model("../data/simulated/models/roberta/geohashcode-model")
+trainer.save_model(f"{model_path}/final")
