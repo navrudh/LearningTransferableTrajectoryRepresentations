@@ -1,4 +1,5 @@
 import pickle
+from typing import List, Tuple
 
 import h5py
 import numpy as np
@@ -22,6 +23,11 @@ def process_queries(query_db_pyh5_file: str, trj_pyh5_file: str, embeddings_file
 
 
 if __name__ == '__main__':
+    experiment_prefixes: List[Tuple[str, int, int]] = [
+        ("exp1", 100_000, 10_000), ("exp2-r2", 10_000, 10_000), ("exp2-r4", 10_000, 10_000),
+        ("exp2-r6", 10_000, 10_000)
+    ]
+
     process_queries(
         query_db_pyh5_file='../../data/t2vec-traveltime/traveltime-querydb.h5',
         trj_pyh5_file='../../data/t2vec-traveltime/traveltime-trj.h5',

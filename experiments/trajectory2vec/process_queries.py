@@ -64,9 +64,10 @@ if __name__ == '__main__':
         "trajectory2vec.test.query_database.pkl",
     ]
 
-    for file in input_files:
+    for src_file in input_files:
+        dest_file = src_file.replace(".pkl", ".results.pkl")
         process_queries(
-            query_file=f"{data_dir}/{experiment_data_dir}/{file}",
-            results_file=f"{data_dir}/{experiment_data_dir}/{file}".replace(".pkl", ".results.pkl"),
+            query_file=f"{data_dir}/{experiment_data_dir}/{src_file}",
+            results_file=f"{data_dir}/{experiment_data_dir}/{dest_file}",
             eval_model=eval_model
         )

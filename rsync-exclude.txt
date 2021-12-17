@@ -7,7 +7,6 @@
 - **/*.tgz
 - **/*.gz
 - **/*ubyte*
-- **/*raw*
 - **/__pycache__
 - **/.ipynb_checkpoints
 - **/lightning_logs
