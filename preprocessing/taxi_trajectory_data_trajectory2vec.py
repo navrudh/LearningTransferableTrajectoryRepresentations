@@ -5,9 +5,9 @@ Prepare trajectory2vec data
 script version: v4
 
 """
-
 import json
 import math
+import os
 import random
 from typing import List, Union
 
@@ -44,14 +44,16 @@ def prepare_taxi_data(in_file: str, out_prefix: str, seq_len=600, window_len=300
     print("Processing Train")
 
     # create source data
-    train_df['SOURCE'] = train_df['POLYLINE'].transform(lambda gps_meter_list: downsampling_distort(gps_meter_list))
+    train_df['SOURCE'] = train_df['POLYLINE'].transform(
+        lambda gps_meter_list: downsampling_distort(gps_meter_list, safe=True)
+    )
 
     # process target data
     train_df['POLYLINE'] = train_df['POLYLINE'].transform(
         lambda gps_meter_list: sliding_window(gps_meter_list, seq_len, window_len, show_timestamps=show_timestamps)
     )
     # normalization
-    tr_min, tr_max = compute_min_max(train_df)
+    tr_min, tr_max = compute_min_max(train_df['POLYLINE'])
     tr_diff = tr_max - tr_min
     train_df['POLYLINE'] = train_df['POLYLINE'].transform(lambda arr: (arr - tr_min) / tr_diff)
 
@@ -105,7 +107,8 @@ def prepare_taxi_data(in_file: str, out_prefix: str, seq_len=600, window_len=300
     )
     save_pickle(d_sim_processed, get_dataset_file(test_prefix, suffix="similarity-ds_0.0"))
 
-    for rate in [0.2, 0.4, 0.6]:
+    # downsampling at 0.6 breaks trajectories, some trajectories have 0 points, and modin.pd throws division errors
+    for rate in [0.2, 0.4]:
         print(f"downsampling rate : {rate}")
         downsampled_d_sim = d_sim['POLYLINE'].apply(lambda trip: downsampling(trip, rate))
         downsampled_d_sim = downsampled_d_sim.apply(
@@ -135,7 +138,8 @@ def prepare_taxi_data(in_file: str, out_prefix: str, seq_len=600, window_len=300
     )
     save_pickle(trajectory_queries, get_dataset_file(test_prefix, suffix="dp-traj-ds_0.0"))
 
-    for rate in [0.2, 0.4, 0.6]:
+    # downsampling at 0.6 breaks trajectories, some trajectories have 0 points, and modin.pd throws division errors
+    for rate in [0.2, 0.4]:
         print(f"downsampling rate : {rate}")
         downsampled_d_dp = destination_task_trajectories['POLYLINE'].apply(lambda trip: downsampling(trip, rate))
         downsampled_d_dp = downsampled_d_dp.apply(
@@ -162,7 +166,8 @@ def prepare_taxi_data(in_file: str, out_prefix: str, seq_len=600, window_len=300
     )
     save_pickle(queries, get_dataset_file(test_prefix, suffix="tte-ds_0.0"))
 
-    for rate in [0.2, 0.4, 0.6]:
+    # downsampling at 0.6 breaks trajectories, some trajectories have 0 points, and modin.pd throws division errors
+    for rate in [0.2, 0.4]:
         print(f"downsampling rate : {rate}")
         downsampled_d_tte = traveltime_task_data['POLYLINE'].apply(lambda trip: downsampling(trip, rate))
         downsampled_d_tte = downsampled_d_tte.apply(
@@ -230,7 +235,7 @@ def sliding_window(arr: np.array, window_size_seconds: int, slide_step_seconds: 
 
 
 def sliding_window_varying_samplerate(
-    arr: np.array, window_size_seconds: int, slide_step_seconds: int, show_timestamps=True
+        arr: np.array, window_size_seconds: int, slide_step_seconds: int, show_timestamps=True
 ):
     movement_features, timesteps = calc_car_movement_features(arr, show_timestamps=show_timestamps)
 
@@ -245,13 +250,13 @@ def sliding_window_varying_samplerate(
 
 
 def build_behavior_matrix(
-    df: pd.Series,
-    seq_len: int,
-    window_len: int,
-    tr_min: np.array,
-    tr_diff: np.array,
-    window_fn=sliding_window,
-    show_timestamps=True
+        df: pd.Series,
+        seq_len: int,
+        window_len: int,
+        tr_min: np.array,
+        tr_diff: np.array,
+        window_fn=sliding_window,
+        show_timestamps=True
 ):
     df = df.apply(
         lambda gps_meter_list: window_fn(gps_meter_list, seq_len, window_len, show_timestamps=show_timestamps)
@@ -316,9 +321,9 @@ def calc_feature_stat_matrix(x: np.ndarray):
     )
 
 
-def compute_min_max(df: pd.DataFrame):
-    _min = df['POLYLINE'].apply(lambda arr: np.min(arr, 0, initial=FLOAT_MAX)).to_list()
-    _max = df['POLYLINE'].apply(lambda arr: np.max(arr, 0, initial=FLOAT_MIN)).to_list()
+def compute_min_max(series: pd.Series):
+    _min = series.apply(lambda arr: np.min(arr, 0, initial=FLOAT_MAX)).to_list()
+    _max = series.apply(lambda arr: np.max(arr, 0, initial=FLOAT_MIN)).to_list()
 
     _min = np.min(_min, axis=0)
     _max = np.max(_max, axis=0)
@@ -334,9 +339,12 @@ if __name__ == '__main__':
     ray.shutdown()
     ray.init()
 
+    output_dir = "../data/trajectory2vec-show_timestamps_3"
+    os.makedirs(output_dir, exist_ok=True)
+
     prepare_taxi_data(
         in_file="../data/train.csv",
-        out_prefix="../data/trajectory2vec-show_timestamps_3/trajectory2vec",
+        out_prefix=f"{output_dir}/trajectory2vec",
         seq_len=300,
         window_len=150,
         show_timestamps=True

@@ -4,7 +4,7 @@ from typing import Union
 import modin.pandas as pd
 import numpy as np
 
-from utils.array import downsampling
+from utils.array import downsampling, downsampling_safe
 from utils.gps import distort
 
 EPSILON = 1e-10
@@ -72,12 +72,15 @@ def get_subtrajectories(df: pd.DataFrame):
     return df_a, df_b
 
 
-def downsampling_distort(trip: np.ndarray):
+def downsampling_distort(trip: np.ndarray, safe=False):
     noise_trips = []
     dropping_rates = [0, 0.2, 0.4, 0.6]
     distorting_rates = [0, 0.3, 0.6]
     for dropping_rate in dropping_rates:
-        noisetrip1 = downsampling(trip, dropping_rate)
+        if safe:
+            noisetrip1 = downsampling_safe(trip, dropping_rate)
+        else:
+            noisetrip1 = downsampling(trip, dropping_rate)
         for distorting_rate in distorting_rates:
             noisetrip2 = distort(noisetrip1, distorting_rate)
             noise_trips.append(noisetrip2)

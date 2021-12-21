@@ -8,6 +8,7 @@ script version: v1
 
 import csv
 import json
+import os
 import random
 from pathlib import Path
 from typing import List, Tuple, Union
@@ -171,4 +172,7 @@ if __name__ == '__main__':
     ray.shutdown()
     ray.init()
 
-    prepare_taxi_data(in_file="../data/train.csv", out_prefix="../data/geohash_1/geohash")
+    output_dir = "../data/simulated/geohash"
+    os.makedirs(output_dir, exist_ok=True)
+
+    prepare_taxi_data(in_file="../data/simulated/test.csv", out_prefix=f"{output_dir}/geohash_test")

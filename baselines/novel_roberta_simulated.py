@@ -9,7 +9,7 @@ from transformers import (
 logger = logging.getLogger("experiment-logger")
 
 tokenizer = PreTrainedTokenizerFast(
-    tokenizer_file="../data/simulated/tokenizer-geohash-bbpe.json",
+    tokenizer_file="../data/simulated/tokenizer-simulated-geohash-bbpe.json",
     bos_token="<s>",
     eos_token="</s>",
     pad_token="<pad>",
@@ -19,14 +19,14 @@ tokenizer = PreTrainedTokenizerFast(
 
 
 def encode(batch):
-    return tokenizer(batch["text"], padding="max_length", truncation=True, max_length=200)
+    return tokenizer(batch["text"], padding="max_length", truncation=True, max_length=256)
 
 
 dataset = load_dataset(
     'text',
     data_files={
-        'train': '../data/simulated/train.train.dataframe.pkl.csv',
-        'validation': '../data/simulated/test.train.dataframe.pkl.csv'
+        'train': '../data/simulated/geohash/geohash.train.dataframe.pkl.csv',
+        'validation': '../data/simulated/geohash/geohash_test.train.dataframe.pkl.csv'
     }
 )
 dataset.set_transform(encode)
@@ -72,4 +72,4 @@ trainer = Trainer(
 logger.info("Begin training")
 trainer.train()
 logger.info("End training")
-trainer.save_model("../data/simulated/models/roberta/geohashcode-model")
+trainer.save_model("../data/simulated/models/roberta/attention-heads-8")
