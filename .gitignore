@@ -37,6 +37,9 @@ checkpoints
 # mpeltonen/sbt-idea plugin
 .idea_modules/
 
+# Dask
+dask-worker-space
+
 # Pytorch
 lightning_logs
 logs
