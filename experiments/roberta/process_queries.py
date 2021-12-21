@@ -63,10 +63,10 @@ def process_queries(query_file, results_file, eval_model: AutoModel, tokenizer: 
 
 if __name__ == '__main__':
     data_dir = "../../data"
-    experiment_data_dir = "geohash_1"
+    experiment_data_dir = "geohash_2"
 
-    model_path = '../../data/models/roberta/v1-8epoch/final'
-    experiment_output_dir = "processed_roberta_h8"  # data_dir/outdir (created if missing)
+    model_path = '../../data/models/roberta/attention-head-8'
+    experiment_output_dir = "processed_roberta_h4"  # data_dir/outdir (created if missing)
 
     input_files = [
         # similarity
