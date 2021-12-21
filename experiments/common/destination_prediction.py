@@ -6,7 +6,7 @@ import pandas as pd
 import pytorch_lightning as pl
 from pl_bolts.datamodules import SklearnDataset
 from sklearn.model_selection import KFold
-from torch.optim import Adam
+from torch.optim import AdamW
 from torch.optim.lr_scheduler import ExponentialLR
 from torch.utils.data import DataLoader
 
@@ -22,6 +22,9 @@ def run_destination_prediction_experiment(query_result_file: str, target_file: s
     :return:
     """
     pl.seed_everything(42)
+
+    print("Query: " + query_result_file)
+    print("Target:    " + target_file)
 
     data = pickle.load(open(query_result_file, 'rb'))
     data = [item[1] for item in data]
@@ -42,7 +45,7 @@ def run_destination_prediction_experiment(query_result_file: str, target_file: s
             input_dim=256,
             output_dim=2,
             learning_rate=1e-2,
-            optimizer=Adam,
+            optimizer=AdamW,
             scheduler=ExponentialLR,
             scheduler_kwargs={'gamma': 0.85},
             scheduler_config={'interval': 'epoch'}

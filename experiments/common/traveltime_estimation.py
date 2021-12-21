@@ -6,13 +6,13 @@ import pandas as pd
 import pytorch_lightning as pl
 from pl_bolts.datamodules import SklearnDataset
 from sklearn.model_selection import KFold
-from torch.optim import SGD
+from torch.optim import AdamW
 from torch.utils.data import DataLoader
 
 from models.linear_regression import LinearRegression
 
 
-def run_traveltime_estimation_experiment(query_result_file: str, target_file: str):
+def run_traveltime_estimation_experiment(query_result_file: str, target_file: str, lr=1e-3, epochs=5):
     print("Query: " + query_result_file)
     print("DB:    " + target_file)
 
@@ -30,7 +30,7 @@ def run_traveltime_estimation_experiment(query_result_file: str, target_file: st
         test_dataset = SklearnDataset(X=data[test_idx], y=target[test_idx])
         train_loader = DataLoader(train_dataset, num_workers=2)
         test_loader = DataLoader(test_dataset, num_workers=2)
-        model = LinearRegression(input_dim=256, learning_rate=1e-3, optimizer=SGD)
-        trainer = pl.Trainer(gpus=1, max_epochs=5, deterministic=True)
+        model = LinearRegression(input_dim=256, learning_rate=lr, optimizer=AdamW)
+        trainer = pl.Trainer(gpus=1, max_epochs=epochs, deterministic=True)
         trainer.fit(model, train_dataloader=train_loader)
         trainer.test(test_dataloaders=test_loader)
