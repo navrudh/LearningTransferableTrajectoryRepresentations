@@ -1,3 +1,4 @@
+import os
 import pickle
 
 import torch
@@ -40,11 +41,13 @@ def process_queries(query_file, results_file, eval_model: BaselineTrajectory2Vec
 
 
 if __name__ == '__main__':
-    data_dir = "../../data"
+    eval_model = load_eval_model(path=f"../../data/models/trajectory2vec.ckpt", input_size=36)
 
-    eval_model = load_eval_model(path=f"{data_dir}/models/trajectory2vec-show-timestamp.ckpt", input_size=36)
+    experiment_dir = "../../data/"
 
-    experiment_data_dir = "trajectory2vec-show_timestamps_2"
+    output_dir = '../../data/processed_trajectory2vec'
+    os.makedirs(output_dir, exist_ok=True)
+
     input_files = [
         # destination prediction
         "trajectory2vec.test-dp-traj-ds_0.0.dataframe.pkl",
@@ -61,13 +64,11 @@ if __name__ == '__main__':
         "trajectory2vec.test-similarity-ds_0.2.dataframe.pkl",
         "trajectory2vec.test-similarity-ds_0.4.dataframe.pkl",
         "trajectory2vec.test-similarity-ds_0.6.dataframe.pkl",
-        "trajectory2vec.test.query_database.pkl",
+        "trajectory2vec.test.dataframe.pkl",
     ]
 
     for src_file in input_files:
         dest_file = src_file.replace(".pkl", ".results.pkl")
         process_queries(
-            query_file=f"{data_dir}/{experiment_data_dir}/{src_file}",
-            results_file=f"{data_dir}/{experiment_data_dir}/{dest_file}",
-            eval_model=eval_model
+            query_file=f"{experiment_dir}/{src_file}", results_file=f"{output_dir}/{dest_file}", eval_model=eval_model
         )
