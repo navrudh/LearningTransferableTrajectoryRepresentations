@@ -1,7 +1,9 @@
 from experiments.common.destination_prediction import run_destination_prediction_experiment
 
 if __name__ == '__main__':
-    run_destination_prediction_experiment(
-        query_result_file='../../data/t2vec-destination-prediction/test-trajectories.embeddings.pkl',
-        target_file='../../data/t2vec-destination-prediction/test-destinations.dataframe.pkl'
-    )
+    for rate in [0.0, 0.2, 0.4, 0.6]:
+        rate10 = int(rate * 10)
+        run_destination_prediction_experiment(
+            query_result_file=f"../../data/processed_t2vec/exp2-r{rate10}.query.results.pkl",
+            target_file="../../data/processed_t2vec/dp.destinations.pkl"
+        )
