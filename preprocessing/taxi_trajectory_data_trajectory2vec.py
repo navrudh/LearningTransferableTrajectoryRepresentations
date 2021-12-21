@@ -235,7 +235,7 @@ def sliding_window(arr: np.array, window_size_seconds: int, slide_step_seconds: 
 
 
 def sliding_window_varying_samplerate(
-        arr: np.array, window_size_seconds: int, slide_step_seconds: int, show_timestamps=True
+    arr: np.array, window_size_seconds: int, slide_step_seconds: int, show_timestamps=True
 ):
     movement_features, timesteps = calc_car_movement_features(arr, show_timestamps=show_timestamps)
 
@@ -250,13 +250,13 @@ def sliding_window_varying_samplerate(
 
 
 def build_behavior_matrix(
-        df: pd.Series,
-        seq_len: int,
-        window_len: int,
-        tr_min: np.array,
-        tr_diff: np.array,
-        window_fn=sliding_window,
-        show_timestamps=True
+    df: pd.Series,
+    seq_len: int,
+    window_len: int,
+    tr_min: np.array,
+    tr_diff: np.array,
+    window_fn=sliding_window,
+    show_timestamps=True
 ):
     df = df.apply(
         lambda gps_meter_list: window_fn(gps_meter_list, seq_len, window_len, show_timestamps=show_timestamps)

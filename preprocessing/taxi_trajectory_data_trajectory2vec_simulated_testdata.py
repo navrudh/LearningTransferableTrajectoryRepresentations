@@ -18,8 +18,14 @@ from preprocessing.common import get_dataset_file, panda_types, save_pickle
 from preprocessing.taxi_trajectory_data_trajectory2vec import compute_min_max, gps2meters, sliding_window
 
 
-def prepare_taxi_data(in_file: str, out_prefix: str, norm_file: str, seq_len=600, window_len=300, show_timestamps=True,
-                      ):
+def prepare_taxi_data(
+    in_file: str,
+    out_prefix: str,
+    norm_file: str,
+    seq_len=600,
+    window_len=300,
+    show_timestamps=True,
+):
     test_prefix = out_prefix + ".test"
 
     print("Normalization: Compute Min, Max")
