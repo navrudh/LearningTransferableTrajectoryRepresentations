@@ -115,7 +115,7 @@ def prepare_taxi_data(in_file: str, out_prefix: str):
 
     print("Experiment: DESTINATION PREDICTION")
     destination_task_data = test_series.sample(n=test_size)
-    destinations = destination_task_data.apply(lambda trip: geohash2.decode_exactly(trip[-1]))
+    destinations = destination_task_data.apply(lambda trip: geohash2.decode_exactly (trip[-1])[:2])
     save_pickle(destinations, get_dataset_file(test_prefix, suffix="destinations"))
 
     d_dp = destination_task_data.apply(lambda trip: trip[:int(len(trip) * 0.8)])
