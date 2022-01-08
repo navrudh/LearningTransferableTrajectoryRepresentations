@@ -2,11 +2,8 @@
 
 ---
 
-## Important Files:
+## Important Packages:
 
-### Running Trajectory2vec Similarity Experiments
-
-- preprocessing/taxi_trajectory_data_trajectory2vec.py
-- experiments/baseline_trajectory2vec.py
-- experiments/save_query_results.py
-- experiments/experiment_subtrajectories.py (to get experiment numbers)
+- preprocessing (data generation)
+- baselines (pardon the misnomer - this package contains training scripts for all the models)
+- experiments (scripts to run our experiments)
